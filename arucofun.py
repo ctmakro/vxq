@@ -1,12 +1,8 @@
 import cv2
 cv = cv2
 import numpy as np
-from cv2tools import filt, vis
-
 from types import SimpleNamespace as SN
-
 import time, sys, threading
-
 from utils import *
 
 # some love from https://www.pyimagesearch.com/2020/12/21/detecting-aruco-markers-with-opencv-and-python/
@@ -193,7 +189,6 @@ def detect(image):
 def getgray(frame, downs=1):
     gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
     h,w = gray.shape[:2]
-    # gray = vis.resize_perfect(gray, h//4, w//4, cubic=True, a=2)
     for i in range(downs):
         gray = cv2.pyrDown(gray)
     # gray = cv2.pyrDown(gray)
@@ -399,7 +394,7 @@ def aruco_tracker_gen():
 
     def aruco_tracker(frame, lines, draw_functions):
         nonlocal ind, ae
-        
+
         interval = interval_gen()
 
         transform = ae(frame, lines, draw_functions)
