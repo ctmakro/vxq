@@ -2,6 +2,8 @@
 
 Python code to connect and control the VXQ robot from the Chinese company Javis/Orbisource.
 
+some videos of the robot: <https://www.youtube.com/playlist?list=PLgf8d_DtB-tQLcNqKX8rBWrbKA68WCdPq>
+
 ## requirements
 
 - Python 3.7+
