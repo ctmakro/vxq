@@ -1,31 +1,33 @@
 import numpy as np
 import time
-from vxq_hid import VXQHID
+from vxq_hid import VXQHID,arrayfmt
 
+pi = np.pi
+
+# target angles in radians.
+neut = np.array([pi*.5, pi*.5, pi*1.], dtype='float32')
 dots = np.array([
-    [2048, 2048, 2048],
-    [2048-768, 2048+512, 2048-1024],
-    [2048+768, 2048+512, 2048-1024],
-    [2048,2048,2048],
-    [2048-768, 2048+512, 2048-1024],
-    [2048+768, 2048+512, 2048-1024],
-    [2048, 2048, 2048],
-], dtype='float32')
+    [0,0,0],
+    [-.375*pi, .25*pi, -.5*pi],
+    [+.375*pi, +.25*pi, -.5*pi],
+    [0,0,0],
+    [-.375*pi, +.25*pi, -.5*pi],
+    [+.375*pi, +.25*pi, -.5*pi],
+    [0,0,0],
+], dtype='float32') + neut
 
-v = VXQHID(        # rod lengths, measured from actual robot
-        l1 = 300.,
-        l1_e = 30.,
-        l2 = 560.,
-        l2_e = 30.,
-        l3 = 685., # to j5 center
-)
+v = VXQHID() # don't care about rod lengths (not using IK)
 print('serial number is', v.sn)
-v.wait_for_readouts()
-
-here = v.get_joints()
-print('bot currently at', here)
 
 k = vxq_kinematics = v.k
+
+here = v.get_joints()
+here_c = k.fk(k.count2rad(here[0:3]))
+print('bot currently at', here, arrayfmt(here_c))
+
+# convert all radians to encoder counts
+for i in range(len(dots)):
+    dots[i] = np.array(k.rad2count(dots[i]))
 
 # move to a given encoder count in joint space.
 def joint_goto(p, speed):
@@ -41,3 +43,4 @@ def joint_demo():
         joint_goto(dot, speed=250)
 
 joint_demo()
+time.sleep(2)

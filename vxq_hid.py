@@ -45,11 +45,16 @@ class VXQHID:
         sn = self.connect(serial_number=serial_number)
 
         time.sleep(1)
+
+        self.startup_interval = time.time()
+
         self.start_monitoring_thread()
+        self.wait_for_readouts()
 
     def close(self):
         print('trying to disconnect...')
         self.connected = False
+        time.sleep(0.5)
         self.h.close()
         print(f'disconnected from {self.sn}.')
 
@@ -200,10 +205,10 @@ class VXQHID:
             try:
                 d = self.h.read(64)
             except Exception as e:
-                print(e)
+                print(e, f'({time.time()-self.startup_interval:.2f}s)')
                 if 'read error' in str(e):
                     acc+=1
-                    if acc>10:
+                    if acc>5:
                         print('too much read errors')
                         self.connected = False
                         raise(e)
@@ -217,7 +222,7 @@ class VXQHID:
 
             # if no packet to be read
             if not d:
-                time.sleep(0.05)
+                time.sleep(0.02)
                 # try read again
                 continue
             else:
@@ -288,10 +293,13 @@ class VXQHID:
             joints_cache = self.joints.copy()
             joints_buffer = self.joints.copy()
 
+            while not self.connected:
+                time.sleep(0.2)
+
             # main loop
             while True:
-                while not self.connected:
-                    time.sleep(0.2)
+                if not self.connected:
+                    break
 
                 d = self.read_packet()
 
@@ -438,7 +446,8 @@ def vxq_kinematics_gen(
 
         # angle definitions: refer to Qin's hand drawing
         a1 = - c2r(j[0]) + r90
-        a2 = c2r(j[1]) + r90
+        # a2 = c2r(j[1]) + r90 # old definition
+        a2 = -c2r(j[1]) + r90 # per 20's definition
         a3 = c2r(j[2]) + r180
 
         if len(joints)==3:return np.array([a1,a2,a3], dtype='float32')
@@ -459,7 +468,8 @@ def vxq_kinematics_gen(
 
         r = rads
         j1 = r2c(-r[0] + r90)
-        j2 = r2c(r[1] - r90)
+        # j2 = r2c(r[1] - r90) # old definition
+        j2 = r2c(-r[1] + r90) # per 20's definition
         j3 = r2c(r[2] - r180)
 
         if len(rads)==3:return np.array([j1,j2,j3], dtype='float32')
@@ -709,11 +719,11 @@ if __name__ == '__main__':
         [0,200,1100],
         [0,200,100],
 
-        [0,300,-10],
-        [800, 300, -10],
-        [800,600, -10],
-        [-800, 600, -10],
-        [-800, 300, -10],
+        [0,300,-100],
+        [800, 300, -100],
+        [800,600, -100],
+        [-800, 600, -100],
+        [-800, 300, -100],
 
         [0,200,100]
     ], dtype='float32')
@@ -732,41 +742,56 @@ if __name__ == '__main__':
             l3 = 685., # to j5 center
     )
     print('serial number is', v.sn)
-    v.wait_for_readouts()
+
     # test close functionality
     v.close()
-
-    v = VXQHID(        # rod lengths, measured from robot
+    v = VXQHID(        # rod lengths, shorter(newer) version
             l1 = 300.,
             l1_e = 30.,
-            l2 = 560.,
+            l2 = 510.,
             l2_e = 30.,
-            l3 = 685., # to j5 center
+            l3 = 640., # to j5 center
     )
     print('serial number is', v.sn)
-    v.wait_for_readouts()
 
     here = v.get_joints()
-    print('bot at', here)
+    here_c = k.fk(k.count2rad(here[0:3]))
+    print('bot at', here, arrayfmt(here_c))
+
+    # move to a given encoder count in joint space.
+    def joint_goto(p, speed=100):
+        dt = 0.08 # send command every 80 ms
+        here_joints = v.get_joints()[0:3]
+        wps = k.planpath_raw(here_joints, p, speed=speed, dt=dt)
+        for wp in wps:
+            time.sleep(dt)
+            v.go(wp)
+
+
 
     # move to a given coordinate in ik mode.
-    def ik_goto(p, speed=100):
-        dt = 0.08
-        here_coords = k.fk(k.count2rad(v.get_joints()[0:3]))
-        wps = k.planpath_ik(here_coords, p, speed=speed, dt=dt)
+    def ik_move(p0, p1, speed):
+        dt = 0.08 # send command every 80 ms
+        wps = k.planpath_ik(p0, p1, speed=speed, dt=dt)
         for wp in wps:
             time.sleep(dt)
             v.go(k.rad2count(wp))
 
+    # iterate over the points.
     def ik_demo(r=1):
-        for dot in dots:
-            ik_goto(dot, speed=250)
+        # move to starting point in joint space
+        starting_point_j = k.rad2count(k.ik(dots[0]))
+        print('spj', starting_point_j)
+        joint_goto(starting_point_j, speed=400)
 
+        for j in range(r):
+            for i in range(1, len(dots)):
+                ik_move(dots[i-1], dots[i], speed=200)
+
+    pi = np.pi
     def swing(r=1):
         for j in range(r):
-            v.go([2048, 3000, 1000])
-            time.sleep(1)
-            v.go([2048, 2048, 2048])
-            time.sleep(1)
+            joint_goto(k.rad2count([pi*0.5, pi*0.75, pi*0.5]), speed=200)
+            joint_goto(k.rad2count([pi*0.5, pi*0.5, pi*1.]), speed=200)
 
     # time.sleep(3)

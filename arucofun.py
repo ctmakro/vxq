@@ -388,6 +388,14 @@ def mark_detections(image, detection_l):
             color=(255,255,255), shadow=False,
         )
 
+def dwsline2p_white(df,frame, p0, p1):
+    df.append(lambda:
+        dwsline(frame,
+            (int(p0.cxy[0]*8), int(p0.cxy[1]*8)),
+            (int(p1.cxy[0]*8), int(p1.cxy[1]*8)),
+            color=(255,255,200), shift=3)
+    )
+
 def aruco_tracker_gen():
     ind = {}
     ae = affine_estimator_gen()
@@ -411,17 +419,29 @@ def aruco_tracker_gen():
                     v.update()
 
                     v.iage+=1
-                    if v.iage>16\
-                        or v.cxy[0]<0 or v.cxy[0]>frame.shape[1]\
-                        or v.cxy[1]<0 or v.cxy[1]>frame.shape[0]:
+                    if (v.iage>16)\
+                        or (v.cxy[0]<0) or (v.cxy[0]>frame.shape[1])\
+                        or (v.cxy[1]<0) or (v.cxy[1]>frame.shape[0]):
                         del ind[k]
 
             ind.update(dd)
-            tags = ind
         else:
-            tags = dd
+            ind = dd.copy()
+        tags = ind
 
         draw_functions.append(lambda:mark_detections(frame, tags.values()))
+
+        for i in range(4):
+            try:
+                # print(i in tags, (i+1)%4 in tags)
+                p0 = tags[i]
+                p1 = tags[(i+1) % 4]
+            except:
+                continue
+            else:
+                # print(i, (i+1)%4)
+                dwsline2p_white(draw_functions,frame, p0, p1)
+
         return tags
 
     return aruco_tracker
