@@ -1,5 +1,9 @@
 fn='positions.csv'
 
+import sys
+fn = sys.argv[1]
+
+
 with open(fn, 'r') as f:
     csv = f.read()
 
