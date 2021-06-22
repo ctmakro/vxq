@@ -542,10 +542,15 @@ def vxq_kinematics_gen(
     l1ex = - l1_e
     l1ey = 0.
 
-    import autograd.numpy as np  # Thinly-wrapped numpy
-    from autograd import grad, elementwise_grad as egrad
-    import numpy as onp
-    on = onp
+    try:
+        import autograd
+    except:
+        print('autograd not found. install via "pip install autograd"')
+    else:
+        import autograd.numpy as np  # Thinly-wrapped numpy
+        from autograd import grad, elementwise_grad as egrad
+        import numpy as onp
+        on = onp
 
     # convert radians 2 angle
     def r2a(r): return r / np.pi * 180
@@ -875,4 +880,5 @@ if __name__ == '__main__':
             v.g1_radians([pi*0.5, pi*0.75, pi*0.5], speed=200)
             v.g1_radians([pi*0.5, pi*0.5, pi*1.0])
 
+    def r(): swing(1); ik_demo(1)
     # time.sleep(3)

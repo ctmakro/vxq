@@ -1,6 +1,6 @@
 import numpy as np
 import time
-from vxq_hid import VXQHID,arrayfmt
+from vxq_hid import VXQHID
 
 pi = np.pi
 
