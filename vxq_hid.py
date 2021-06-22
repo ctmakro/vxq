@@ -5,9 +5,12 @@ import time,re,threading,math
 
 import numpy as np
 
+def npa(a, dtype='float32'):
+    return np.array(a, dtype=dtype)
+
 def arrayfmt(a, to_int=False):
     if to_int:
-        return f"[{' '.join([f'{int(ai):4d}' for ai in a])}]"
+        return f"[{' '.join([f'{round(ai):4d}' for ai in a])}]"
     else:
         return f"[{' '.join([f'{ai:.2f}' for ai in a])}]"
 
@@ -41,6 +44,7 @@ def getts(): return int(time.time()*1000) & u32
 class VXQHID:
     def __init__(self, serial_number=None, **k):
         self.k = vxq_kinematics_gen(**k)
+
         self.connected = False
         sn = self.connect(serial_number=serial_number)
 
@@ -148,8 +152,10 @@ class VXQHID:
 
         self.joints = [None]*8
         self.jlp = [None]*8
+        self.joint_setvalues = [None]*8
 
         self.sn = serial_number
+        self.speed = 100
 
     def write_packet(self, ba):
         # n = 0
@@ -196,8 +202,17 @@ class VXQHID:
         speedset = b'\xff'
 
         # angles not specified in 'targets' are replaced
-        # with their current value
-        ja = self.joints.copy()[0:6]
+        # with their set value
+        ja = self.joint_setvalues.copy() # set values we kept
+        jlp = self.jlp.copy() # set values read from machine
+
+        for idx, i in enumerate(ja):
+            if ja[idx] is None:
+                if jlp[idx] is not None:
+                    ja[idx] = int(jlp[idx])
+
+        # # with their current value
+        # ja = self.joints.copy()[0:6]
 
         for i,t in enumerate(targets):
             if t is not None:
@@ -206,12 +221,14 @@ class VXQHID:
         if None in ja:
             raise Exception('no readouts yet, not sure what to send')
 
-        print('writing:', arrayfmt(ja, to_int=True))
+        print('writing:', arrayfmt(ja[:6], to_int=True))
 
         c = ts + mtype + mode + flags + speedset + \
             b''.join([f2b(a) for a in ja])
 
         self.write_packet(c)
+
+        self.joint_setvalues = ja
 
     # read packet with retries and reconnections.
     def read_packet(self):
@@ -375,6 +392,7 @@ class VXQHID:
 
                         # print(f'sf:{subframe} mo_stat:{motion_status}, speedset:{speedset}')
 
+                        self.jlp[6:8] = 0, 0 # unused so far
                         for i in range(6):
                             self.jlp[i] = b2f(bytes(d[so+32+i*4: so+32+(i+1)*4]))
 
@@ -421,6 +439,76 @@ class VXQHID:
     def get_joints(self):
         return self.joints.copy()
 
+    def g0_joint(self, arr):
+        return self.go(arr)
+
+    # move to given encoder counts, all axis in sync, in joint space
+    def g1_joint(self, arr, speed=None):
+        self.speed = speed = speed or self.speed
+
+        assert len(arr)<=6
+
+        # which joints selected?
+        idxes = [i for i,n in enumerate(arr) if n is not None]
+
+        # current position of each of the joints
+        here_joints = self.get_joints()
+
+        # pack
+        targ_relevant = npa([arr[idx] for idx in idxes])
+        here_relevant = npa([here_joints[idx] for idx in idxes])
+
+        dt = 0.08
+
+        # interpolate
+        wps = self.k.planpath_raw(
+            here_relevant,
+            targ_relevant,
+            speed=speed,
+            dt=dt,
+        )
+
+        for wp in wps:
+            # unpack
+            to_send = [None]*6
+            for i,idx in enumerate(idxes):
+                to_send[idx] = wp[i]
+            wp = [arr[i] for i in range(len(arr))]
+            self.g0_joint(to_send)
+            time.sleep(dt)
+
+    # same but use radians as input
+    def g1_radians(self, arr, *a, **k):
+        return self.g1_joint(self.k.rad2count(arr), *a, **k)
+
+    # move to given cartesian coordinates, all axis in sync, in joint space
+    def g1_cartesian_joint(self, coord, *a, **kw):
+        targ = self.k.rad2count(self.k.ik(coord[0:3]))
+        return self.g1_joint(targ, *a, **kw)
+
+    # move to given cartesian coordinates, all axis in sync, in cartesian space
+    def g1_cartesian_ik_withstart(self, p0, p1, speed):
+        self.speed = speed = speed or self.speed
+
+        k = self.k
+        dt = 0.08 # send command every 80 ms
+        wps = k.planpath_ik(p0[0:3], p1[0:3], speed=speed, dt=dt)
+        for wp in wps:
+            self.g0_joint(k.rad2count(wp))
+            time.sleep(dt)
+
+    # same but only specify end point
+    def g1_cartesian_ik(self, p1, *a, **kw):
+        here_joints = self.get_joints()
+        p0 = self.k.fk(here_joints[0:3])
+        return self.g1_cartesian_ik_withstart(p0, p1, *a, **kw)
+
+    # string describing joints and fk cartesian coords.
+    def whereami(self):
+        here = self.get_joints()
+        here_c = self.k.fk(self.k.count2rad(here[0:3]))
+        return arrayfmt(here, True) + ' ' + arrayfmt(here_c, True)
+
 # for k,v in vxqusbh.items():
 #     print(k,v)
 
@@ -428,13 +516,28 @@ class VXQHID:
 # print(intify('0xff'))
 
 def vxq_kinematics_gen(
-        # rod lengths, measured from robot
+        # arm lengths, measured from robot
         l1 = 300.,
         l1_e = 30.,
         l2 = 560.,
         l2_e = 30.,
         l3 = 685., # to j5 center
+
+        configuration='original',
     ):
+
+    # different arm length version of the same robot
+    if configuration in ['debug', 'early', 'original']:
+        pass
+    elif configuration in ['release', 'trimmed']:
+        l2 = 510.; l3 = 640.
+    elif configuration in ['shorter', 'mini']:
+        l2 = 310.; l3 = 365.
+    else:
+        raise Exception('unknown arm lengths configuration')
+
+    print(f'kinematics configuration:')
+    print(f'l1(e) {l1}({l1_e})mm, l2(e) {l2}({l2_e})mm, l3 {l3}mm')
 
     l1ex = - l1_e
     l1ey = 0.
@@ -727,11 +830,17 @@ def vxq_kinematics_gen(
         r2a = r2a, a2r = a2r,
     )
 
-vxq_kinematics = vxq_kinematics_gen()
-
 if __name__ == '__main__':
 
-    k = vxq_kinematics
+    v = VXQHID()
+    print('serial number is', v.sn)
+
+    # test close functionality
+    v.close()
+
+    v = VXQHID(configuration='original')
+    print('serial number is', v.sn)
+    print('bot currently at', v.whereami())
 
     dots = np.array([
         [0,200,100],
@@ -748,70 +857,22 @@ if __name__ == '__main__':
         [0,200,100]
     ], dtype='float32')
 
+    k = v.k
     # check if above waypoints reachable
     ik_dots = [k.rad2count(k.ik(dot)) for dot in dots]
-    # print('dots, ik_dots')
-    # print(dots)
-    # print(ik_dots)
-
-    v = VXQHID(        # rod lengths, measured from robot
-            l1 = 300.,
-            l1_e = 30.,
-            l2 = 560.,
-            l2_e = 30.,
-            l3 = 685., # to j5 center
-    )
-    print('serial number is', v.sn)
-
-    # test close functionality
-    v.close()
-    v = VXQHID(        # rod lengths, shorter(newer) version
-            l1 = 300.,
-            l1_e = 30.,
-            l2 = 510.,
-            l2_e = 30.,
-            l3 = 640., # to j5 center
-    )
-    print('serial number is', v.sn)
-
-    here = v.get_joints()
-    here_c = k.fk(k.count2rad(here[0:3]))
-    print('bot at', here, arrayfmt(here_c))
-
-    # move to a given encoder count in joint space.
-    def joint_goto(p, speed=100):
-        dt = 0.08 # send command every 80 ms
-        here_joints = v.get_joints()[0:3]
-        wps = k.planpath_raw(here_joints, p, speed=speed, dt=dt)
-        for wp in wps:
-            time.sleep(dt)
-            v.go(wp)
-
-
-
-    # move to a given coordinate in ik mode.
-    def ik_move(p0, p1, speed):
-        dt = 0.08 # send command every 80 ms
-        wps = k.planpath_ik(p0, p1, speed=speed, dt=dt)
-        for wp in wps:
-            time.sleep(dt)
-            v.go(k.rad2count(wp))
 
     # iterate over the points.
     def ik_demo(r=1):
         # move to starting point in joint space
-        starting_point_j = k.rad2count(k.ik(dots[0]))
-        print('spj', starting_point_j)
-        joint_goto(starting_point_j, speed=400)
-
+        v.g1_cartesian_joint(dots[0], speed=300)
         for j in range(r):
             for i in range(1, len(dots)):
-                ik_move(dots[i-1], dots[i], speed=200)
+                v.g1_cartesian_ik_withstart(dots[i-1], dots[i], speed=200)
 
     pi = np.pi
     def swing(r=1):
         for j in range(r):
-            joint_goto(k.rad2count([pi*0.5, pi*0.75, pi*0.5]), speed=200)
-            joint_goto(k.rad2count([pi*0.5, pi*0.5, pi*1.]), speed=200)
+            v.g1_radians([pi*0.5, pi*0.75, pi*0.5], speed=200)
+            v.g1_radians([pi*0.5, pi*0.5, pi*1.0])
 
     # time.sleep(3)
