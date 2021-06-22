@@ -42,8 +42,9 @@ u32 = 2**32 - 1
 def getts(): return int(time.time()*1000) & u32
 
 class VXQHID:
-    def __init__(self, serial_number=None, **k):
+    def __init__(self, serial_number=None, quiet=False, **k):
         self.k = vxq_kinematics_gen(**k)
+        self.quiet = quiet
 
         self.connected = False
         sn = self.connect(serial_number=serial_number)
@@ -221,7 +222,8 @@ class VXQHID:
         if None in ja:
             raise Exception('no readouts yet, not sure what to send')
 
-        print('writing:', arrayfmt(ja[:6], to_int=True))
+        if not self.quiet:
+            print('sending position command:', arrayfmt(ja[:6], to_int=True))
 
         c = ts + mtype + mode + flags + speedset + \
             b''.join([f2b(a) for a in ja])
@@ -403,12 +405,14 @@ class VXQHID:
                                 jbi = joints_buffer[i]
                                 if (jci is None) or abs(jci-jbi)>2:
                                     rads = self.k.count2rad(joints_buffer)
-                                    print(
-                                    'readback[joints][angles][coords]:',
-                                    arrayfmt(joints_buffer, to_int=True),
-                                    arrayfmt(list(self.k.r2a(rads)),to_int=True),
-                                    arrayfmt(list(self.k.fk(rads)), to_int=True)
-                                    )
+
+                                    if not self.quiet:
+                                        print(
+                                        'readback[joints][angles][coords]:',
+                                        arrayfmt(joints_buffer, to_int=True),
+                                        arrayfmt(list(self.k.r2a(rads)),to_int=True),
+                                        arrayfmt(list(self.k.fk(rads)), to_int=True)
+                                        )
                                     joints_cache = joints_buffer.copy()
                                     break
 
