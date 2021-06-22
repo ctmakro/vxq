@@ -65,11 +65,12 @@ class VXQHID:
         raise Exception(f"Unknown HID version: ({n}) ")
 
     def close(self):
-        print('trying to disconnect...')
-        self.connected = False
-        time.sleep(0.5)
-        self.h.close()
-        print(f'disconnected from {self.sn}.')
+        if hasattr(self, 'h'):
+            print('trying to disconnect...')
+            self.connected = False
+            self.h.close()
+            print(f'disconnected from {self.sn}.')
+
 
     def find_all(self):
         # find all hid devices that are vxq robots
