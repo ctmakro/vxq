@@ -7,7 +7,9 @@ class Stage:
 
         lines = csv.split('\n')
         lines = [l.strip() for l in lines if len(l.strip())>0]
-        lines = [l for l in lines if (not l.startswith('#')) and len([n for n in l.split(',') if len(n)>0])>=6]
+        lines = [l for l in lines
+            if (not l.startswith('#')) \
+            and len([n for n in l.split(',') if len(n)>0])>=6]
 
         # print(lines)
         print('read {} valid line(s) from {}...'.format(
