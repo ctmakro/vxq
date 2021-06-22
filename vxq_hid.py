@@ -51,6 +51,19 @@ class VXQHID:
         self.start_monitoring_thread()
         self.wait_for_readouts()
 
+        # # https://github.com/bitcoin-core/HWI/blob/master/hwilib/devices/trezorlib/transport/hid.py
+        # self.hid_version = self.probe_hid_version()
+        # print('hid_version:', self.hid_version)
+
+    def probe_hid_version(self) -> int:
+        n = self.h.write(bytearray([0, 63] + [0xFF] * 63))
+        if n == 65:
+            return 2
+        n = self.h.write(bytearray([63] + [0xFF] * 63))
+        if n == 64:
+            return 1
+        raise Exception(f"Unknown HID version: ({n}) ")
+
     def close(self):
         print('trying to disconnect...')
         self.connected = False
@@ -96,6 +109,7 @@ class VXQHID:
                 return False
 
             self.connected = True
+            hidd.set_nonblocking(False)
 
             manufs, ps, sns = \
             hidd.get_manufacturer_string(), hidd.get_product_string(), hidd.get_serial_number_string()
@@ -136,15 +150,20 @@ class VXQHID:
 
         self.sn = serial_number
 
-    def write(self, ba):
+    def write_packet(self, ba):
         # n = 0
         # while self.connected==False and n<4:
         #     n+=1
         #     print('not connected while write()', n)
         #     time.sleep(0.5)
 
+        # fill the packet to 64 bytes
+        if len(ba)<64:
+            ba = ba+b'\0'*(64-len(ba))
+
         if self.connected:
-            self.h.write(ba)
+            # always append 0x00 to the beginning
+            self.h.write(b'\0'+ba)
         else:
             raise Exception('device disconnected while trying to write().')
 
@@ -191,7 +210,7 @@ class VXQHID:
         c = ts + mtype + mode + flags + speedset + \
             b''.join([f2b(a) for a in ja])
 
-        self.write(c)
+        self.write_packet(c)
 
     # read packet with retries and reconnections.
     def read_packet(self):
@@ -208,12 +227,12 @@ class VXQHID:
                 print(e, f'({time.time()-self.startup_interval:.2f}s)')
                 if 'read error' in str(e):
                     acc+=1
-                    if acc>5:
+                    if acc>3:
                         print('too much read errors')
                         self.connected = False
                         raise(e)
                     else:
-                        time.sleep(0.3)
+                        time.sleep(0.5)
                         continue
                 else:
                     acc = 0
