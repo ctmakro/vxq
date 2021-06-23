@@ -435,6 +435,8 @@ class AffineTransform():
     def has_solution(self):
         return self.mat is not None
 
+unit_square_coords = {0:[1,1], 1:[1,0], 2:[0,0], 3:[0,1]}
+
 def aruco_tracker_gen():
     ind = {}
     ae = affine_estimator_gen()
@@ -487,12 +489,11 @@ def aruco_tracker_gen():
         # find transform from tag 0-4 to unit square
         found = [] # sources
         unit_square = [] # targets
-        unit_square_coords = usc = {0:[1,1], 1:[1,0], 2:[0,0], 3:[0,1]}
 
         for i in range(4):
             if i in tags:
                 found.append(tags[i].cxy)
-                unit_square.append(usc[i])
+                unit_square.append(unit_square_coords[i])
 
         if len(found)>=4:
             at = AffineTransform()

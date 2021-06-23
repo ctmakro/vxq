@@ -491,7 +491,7 @@ class VXQHID:
         return self.g1_joint(targ, *a, **kw)
 
     # move to given cartesian coordinates, all axis in sync, in cartesian space
-    def g1_cartesian_ik_withstart(self, p0, p1, speed):
+    def g1_cartesian_ik_withstart(self, p0, p1, speed=None):
         self.speed = speed = speed or self.speed
 
         k = self.k
