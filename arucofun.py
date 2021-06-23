@@ -75,8 +75,11 @@ def camloop(f=nop, threaded=False):
 
             lines = [] # lines
             dfs = [] # draw functions
-            result = f(frame, lines, dfs)
 
+            def append_draw_functions(f): dfs.append(f)
+            def append_lines(l): lines.append(l)
+
+            result = f(frame, append_lines, append_draw_functions)
             ts+=f'f() {lps[1](watch())} '
 
             for df in dfs:
@@ -233,7 +236,7 @@ def apply_transform(points, affine):
 
     return np.matmul(points, affine)[...,0:2]
 
-def draw_transform_indicator(image, mat):
+def draw_transform_indicator(image, at):
     s = image.shape
 
     # place it at center of frame
@@ -246,7 +249,7 @@ def draw_transform_indicator(image, mat):
     for i in range(5):
         liness.append(lines)
         # transform the linepoints
-        lines = apply_transform(lines, mat)
+        lines = at.transform(lines)
 
     for i,lines in enumerate(reversed(liness)):
         pwr = 0.8**(len(liness)-i-1)
@@ -272,7 +275,7 @@ def affine_estimator_gen():
                       maxLevel = 10,
                       criteria = (cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 20, 0.01))
 
-    def affine_estimator(frame, lines, draw_functions):
+    def affine_estimator(frame, append_lines, append_draw_function):
         nonlocal old_gray
         result = None
 
@@ -304,30 +307,27 @@ def affine_estimator_gen():
             p0_tracked = p0t = p0[st==1] * 4. # due to previous downscale
             p1_tracked = p1t = p1[st==1] * 4.
 
-            draw_functions.append(lambda:draw_tracks(frame, p0t, p1t))
+            append_draw_function(lambda:draw_tracks(frame, p0t, p1t))
             # ts+=f'draw trks {int(interval()*1000)} '
 
             ss += f'{len(p0_tracked)} tracked '
 
             if len(p0_tracked)>6:
+                interval()
 
-                def estimate(p0t, p1t):
-                    retval, inliers = cv.estimateAffine2D(
-                        p0t, p1t, ransacReprojThreshold=10, maxIters=2000, refineIters=20)
+                at = AffineTransform()
+                at.estimate_from(p0t, p1t)
 
-                    # retval, inliers = cv.estimateAffine2D(
-                    #     p0t, p1t, method=cv.LMEDS,
-                    #     ransacReprojThreshold=10, maxIters=500)
-
-                    # print(p0t.shape, inliers.shape)
-                    draw_functions.append(
+                if at.has_solution():
+                    inliers = at.inliers
+                    append_draw_function(
                         lambda:draw_trackpoints(
                             frame,
                             p1t[inliers[:,0]==1],
                             color=(0, 255, 255),
                         )
                     )
-                    draw_functions.append(
+                    append_draw_function(
                         lambda:draw_trackpoints(
                             frame,
                             p1t[inliers[:,0]==0],
@@ -336,26 +336,22 @@ def affine_estimator_gen():
                         )
                     )
 
-                    retval = np.append(retval, np.array([[0,0,1]]), axis=0)
-                    return retval.T
-
-                interval()
-                retval = estimate(p0t, p1t)
-
-                if len(retval):
                     ss+=f'(xform solved) {int(interval()*1000)}'
 
-                    draw_functions.append(
-                        lambda:draw_transform_indicator(frame, retval))
+                    append_draw_function(
+                        lambda:draw_transform_indicator(frame, at))
 
                     # print(retval)
-                    result = retval
-            else:
-                draw_functions.append(lambda:draw_trackpoints(frame, p1t, radius=5, thickness=2))
+                    result = at
 
-        lines.append(ss)
-        lines.append(ts)
-        lines.append(f'affine estm {int(t_total()*1000)}')
+                else:
+                    ss+=f'(xform not solved) {int(interval()*1000)}'
+            else:
+                append_draw_function(lambda:draw_trackpoints(frame, p1t, radius=5, thickness=2))
+
+        append_lines(ss)
+        append_lines(ts)
+        append_lines(f'affine estm {int(t_total()*1000)}')
 
         old_gray = gray
         return result
@@ -388,34 +384,78 @@ def mark_detections(image, detection_l):
             color=(255,255,255), shadow=False,
         )
 
-def dwsline2p_white(df,frame, p0, p1):
-    df.append(lambda:
+def dwsline2p_white(append_draw_function,frame, p0, p1):
+    append_draw_function(lambda:
         dwsline(frame,
-            (int(p0.cxy[0]*8), int(p0.cxy[1]*8)),
-            (int(p1.cxy[0]*8), int(p1.cxy[1]*8)),
+            (int(p0[0]*8), int(p0[1]*8)),
+            (int(p1[0]*8), int(p1[1]*8)),
             color=(255,255,200), shift=3)
     )
+
+class AffineTransform():
+    def __init__(self):
+        self.inliers, self.mat = None, None
+
+    # estimate from a bunch of points
+    def estimate_from(self, src, dest):
+        retval, inliers = cv.estimateAffine2D(
+            src, dest, ransacReprojThreshold=5, maxIters=2000, refineIters=20)
+
+        if not len(retval):
+            self.inliers = None
+            self.mat = None
+            self.matinv = None
+            return
+
+        retval = np.append(retval, np.array([[0,0,1]]), axis=0).T
+        self.mat = retval
+        self.matinv = np.linalg.inv(self.mat)
+        self.inliers = inliers
+
+    # calculate from 3 points
+    def calculate_from(self, src, dest):
+        retval = cv.getAffineTransform(src, dst)
+        retval = np.append(retval, np.array([[0,0,1]]), axis=0).T
+        self.mat = retval
+
+    def transform(self, points, inverse=False):
+        # points of shape (n, 2)
+        assert points.shape[-1]==2
+
+        # pad points from (n,2) to (n,3) with ones
+        shape_list = list(points.shape)
+        shape_list[-1]=1 # (n, 1)
+        pad = np.ones(shape_list) # ones of shape (n, 1)
+        points = np.concatenate((points, pad), axis=-1, dtype='float32')
+
+        # do the transform
+        mat = self.mat if not inverse else self.matinv
+        return np.matmul(points, mat)[...,0:2]
+
+    def has_solution(self):
+        return self.mat is not None
 
 def aruco_tracker_gen():
     ind = {}
     ae = affine_estimator_gen()
+    tabletop_square_transform = tst = AffineTransform()
 
-    def aruco_tracker(frame, lines, draw_functions):
-        nonlocal ind, ae
+    def aruco_tracker(frame, append_lines, append_draw_function):
+        nonlocal ind, ae, tst
 
         interval = interval_gen()
 
-        transform = ae(frame, lines, draw_functions)
+        transform = ae(frame, append_lines, append_draw_function)
 
         interval()
         dd, dl = detect(frame)
-        lines.append(f'mrkr det in {int(interval()*1000)}')
+        append_lines(f'mrkr det in {int(interval()*1000)}')
 
         if transform is not None:
             to_interp = {}
             for k,v in list(ind.items()): # for each detection in cache
                 if k not in dd: # if not detected in this frame
-                    v.corners = apply_transform(v.corners, transform)
+                    v.corners = transform.transform(v.corners)
                     v.update()
 
                     v.iage+=1
@@ -429,8 +469,9 @@ def aruco_tracker_gen():
             ind = dd.copy()
         tags = ind
 
-        draw_functions.append(lambda:mark_detections(frame, tags.values()))
+        append_draw_function(lambda:mark_detections(frame, tags.values()))
 
+        # draw line between tag 0-4
         for i in range(4):
             try:
                 # print(i in tags, (i+1)%4 in tags)
@@ -440,9 +481,36 @@ def aruco_tracker_gen():
                 continue
             else:
                 # print(i, (i+1)%4)
-                dwsline2p_white(draw_functions,frame, p0, p1)
+                dwsline2p_white(append_draw_function,frame, p0.cxy, p1.cxy)
 
-        return tags
+
+        # find transform from tag 0-4 to unit square
+        found = [] # sources
+        unit_square = [] # targets
+        unit_square_coords = usc = {0:[1,1], 1:[1,0], 2:[0,0], 3:[0,1]}
+
+        for i in range(4):
+            if i in tags:
+                found.append(tags[i].cxy)
+                unit_square.append(usc[i])
+
+        if len(found)>=4:
+            at = AffineTransform()
+            at.estimate_from(np.array(found), np.array(unit_square))
+            if at.has_solution():
+                tst = at
+
+        # draw the transform found by converting a cross into screen space
+        if tst.has_solution():
+            append_lines(f'tst has solution')
+            cross_lines = np.array([[[.5,0], [.5,1]], [[0,.5], [1,.5]]])
+            cross_lines = tst.transform(cross_lines, inverse=True)
+            for p0, p1 in cross_lines:
+                dwsline2p_white(append_draw_function,frame, p0, p1)
+        else:
+            append_lines('tst no solution')
+
+        return tags, tst
 
     return aruco_tracker
 

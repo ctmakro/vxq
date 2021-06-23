@@ -1,8 +1,12 @@
+import sys
+fn = sys.argv[1] if len(sys.argv)>=2 else 'positions.csv'
 
-import time,math,random
+import time,math,random, numpy as np
 
 # read the positions list from file
-from stage import all_points, np
+from javis_ui_play_all import points as all_points
+
+print(f'read {len(all_points)} points from {fn}')
 
 # index of position list we're on
 pind = -1
@@ -54,13 +58,19 @@ class JointController():
         # stage performance
         elif c==',':
             # prev point
-            self.pind = (self.pind-1) % len(all_points)
-            self.slide_to_point(self.pind)
+            if not len(all_points):
+                print('no waypoints to move to')
+            else:
+                self.pind = (self.pind-1) % len(all_points)
+                self.slide_to_point(self.pind)
 
         elif c=='.':
             # next point
-            self.pind = (self.pind+1) % len(all_points)
-            self.slide_to_point(self.pind)
+            if not len(all_points):
+                print('no waypoints to move to')
+            else:
+                self.pind = (self.pind+1) % len(all_points)
+                self.slide_to_point(self.pind)
 
         elif c=='r':
             # set setting to reading
@@ -107,7 +117,7 @@ class JointController():
         print('press h to show this message')
         print('press s to append current joint setting to csv')
 
-from vxq_hid import VXQHID
+from vxq_hid import VXQHID, arrayfmt
 
 v = VXQHID(quiet=True)
 
@@ -117,9 +127,9 @@ class JCV(JointController):
         self.jsettings = [2048]*6
 
     def save_current(self):
-        with open('positions.csv', 'a') as f:
+        with open(fn, 'a+') as f:
             f.write(','.join([str(n) for n in self.jsettings])+'\n')
-        print(self.jsettings,'written to','positions.csv')
+        print(self.jsettings,'written to',fn)
 
 
 import readchar
@@ -138,3 +148,4 @@ while 1:
     jc.update_readings(v.get_joints()[:6])
 
     jc.display_joint_info()
+    print(arrayfmt(v.k.fk(v.k.count2rad(jc.jreadings))))
