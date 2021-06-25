@@ -16,7 +16,7 @@ tags = {}
 from experiment_table_config import mcrcf
 
 def move_to_5_and_back():
-    center_up = (mcrcf[0]+mcrcf[2])/2+np.array([0,0,500])
+    side_up = (mcrcf[1]+mcrcf[2])/2+np.array([0,-300,200])
     base_up = [0, 1, 600]
     # v.g1_cartesian_joint(center_up)
     # v.g1_cartesian_joint(base_up)
@@ -24,7 +24,7 @@ def move_to_5_and_back():
         # for i in range(4):
         #     v.g1_cartesian_joint(mcrcf[i])
         #     time.sleep(0.5)
-        v.g1_cartesian_joint(base_up, speed=300)
+        v.g1_cartesian_joint(side_up, speed=300)
         time.sleep(0.5)
 
         if tst is not None and tst.has_solution():
@@ -45,8 +45,13 @@ def move_to_5_and_back():
                     rc = at.transform(sc) # square to robot cartesian
 
                     default_height = mcrcf[0][2]
-                    v.g1_cartesian_joint(
-                        list(rc)+[default_height], speed=200)
+                    try:
+                        v.g1_cartesian_joint(
+                            list(rc)+[default_height], speed=200)
+                    except Exception as e:
+                        # point might get out of reach or something
+                        print(e)
+
                     time.sleep(0.5)
 
 
