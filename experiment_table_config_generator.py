@@ -5,7 +5,7 @@ fn = sys.argv[1] if len(sys.argv)>=2 else 'table_config.json'
 print('目标配置文件名：',fn)
 
 print('（倒茶机）实验台配置（正方形坐标系）生成器')
-print('请参考 table_config.png')
+print('请参考 table_config.jpg')
 print('请输入正方形的边长A（毫米）')
 side = float(input())
 
