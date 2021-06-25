@@ -5,7 +5,7 @@ v = VXQHID()
 
 time.sleep(.5)
 
-cl = camloop(aruco_tracker_gen(), threaded=True)
+cl = camloop(tabletop_square_matcher_gen(), threaded=True)
 
 tst = None
 tags = {}

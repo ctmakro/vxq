@@ -58,6 +58,8 @@ def camloop(f=nop, threaded=False):
 
         lps = [lpn_gen(3, 0.6, integerize=True) for i in range(4)]
 
+        fail_counter = 0
+
         while 1:
             delta = get_fps_interval()
             fps = 1/max(fpslp(delta),1e-3)
@@ -70,16 +72,24 @@ def camloop(f=nop, threaded=False):
             ts+=f'read() {lps[0](watch())} '
 
             if not ret:
-                print("Can't receive frame (stream end?). Exiting ...")
-                break
+                fail_counter+=1
+                print(f"Can't receive frame (stream end?) {fail_counter}")
+                if fail_counter<3:
+                    time.sleep(.5)
+                    continue
+                else:
+                    print('too many tries, exiting...')
+                    break
 
-            lines = [] # lines
+            lines = [] # text lines to draw
             dfs = [] # draw functions
 
-            def append_draw_functions(f): dfs.append(f)
-            def append_lines(l): lines.append(l)
+            frameobj = SN()
+            frameobj.frame = frame
+            frameobj.draw = lambda f:dfs.append(f)
+            frameobj.drawtext = lambda l: lines.append(l)
 
-            result = f(frame, append_lines, append_draw_functions)
+            result = f(frameobj)
             ts+=f'f() {lps[1](watch())} '
 
             for df in dfs:
@@ -99,6 +109,7 @@ def camloop(f=nop, threaded=False):
 
             rh.result = result
             rh.frame = frame
+            rh.frameobj = frameobj
             rh.fresh = True
 
             if not threaded:
@@ -275,8 +286,10 @@ def affine_estimator_gen():
                       maxLevel = 10,
                       criteria = (cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 20, 0.01))
 
-    def affine_estimator(frame, append_lines, append_draw_function):
+    def affine_estimator(fo):
         nonlocal old_gray
+        frame = fo.frame
+
         result = None
 
         interval = interval_gen()
@@ -287,7 +300,7 @@ def affine_estimator_gen():
 
         if old_gray is None:
             old_gray = gray
-            return frame
+            return None
 
         interval()
         p0 = cv.goodFeaturesToTrack(gray, mask = None, **feature_params)
@@ -307,7 +320,7 @@ def affine_estimator_gen():
             p0_tracked = p0t = p0[st==1] * 4. # due to previous downscale
             p1_tracked = p1t = p1[st==1] * 4.
 
-            append_draw_function(lambda:draw_tracks(frame, p0t, p1t))
+            fo.draw(lambda:draw_tracks(frame, p0t, p1t))
             # ts+=f'draw trks {int(interval()*1000)} '
 
             ss += f'{len(p0_tracked)} tracked '
@@ -320,14 +333,14 @@ def affine_estimator_gen():
 
                 if at.has_solution():
                     inliers = at.inliers
-                    append_draw_function(
+                    fo.draw(
                         lambda:draw_trackpoints(
                             frame,
                             p1t[inliers[:,0]==1],
                             color=(0, 255, 255),
                         )
                     )
-                    append_draw_function(
+                    fo.draw(
                         lambda:draw_trackpoints(
                             frame,
                             p1t[inliers[:,0]==0],
@@ -338,7 +351,7 @@ def affine_estimator_gen():
 
                     ss+=f'(xform solved) {int(interval()*1000)}'
 
-                    append_draw_function(
+                    fo.draw(
                         lambda:draw_transform_indicator(frame, at))
 
                     # print(retval)
@@ -347,11 +360,10 @@ def affine_estimator_gen():
                 else:
                     ss+=f'(xform not solved) {int(interval()*1000)}'
             else:
-                append_draw_function(lambda:draw_trackpoints(frame, p1t, radius=5, thickness=2))
+                fo.draw(lambda:draw_trackpoints(frame, p1t, radius=5, thickness=2))
 
-        append_lines(ss)
-        append_lines(ts)
-        append_lines(f'affine estm {int(t_total()*1000)}')
+        [fo.drawtext(k) for k in
+            [ss, ts, f'affine estm {int(t_total()*1000)}']]
 
         old_gray = gray
         return result
@@ -440,18 +452,18 @@ unit_square_coords = {0:[1,1], 1:[1,0], 2:[0,0], 3:[0,1]}
 def aruco_tracker_gen():
     ind = {}
     ae = affine_estimator_gen()
-    tabletop_square_transform = tst = AffineTransform()
 
-    def aruco_tracker(frame, append_lines, append_draw_function):
-        nonlocal ind, ae, tst
+    def aruco_tracker(fo):
+        nonlocal ind, ae
+        frame = fo.frame
 
         interval = interval_gen()
 
-        transform = ae(frame, append_lines, append_draw_function)
+        transform = ae(fo)
 
         interval()
         dd, dl = detect(frame)
-        append_lines(f'mrkr det in {int(interval()*1000)}')
+        fo.drawtext(f'mrkr det in {int(interval()*1000)}')
 
         if transform is not None:
             to_interp = {}
@@ -471,52 +483,75 @@ def aruco_tracker_gen():
             ind = dd.copy()
         tags = ind
 
-        append_draw_function(lambda:mark_detections(frame, tags.values()))
+        fo.draw(lambda:mark_detections(frame, tags.values()))
+        return tags
 
-        # draw line between tag 0-4
-        for i in range(4):
+    return aruco_tracker
+
+def tabletop_square_matcher_gen():
+    tabletop_square_transform = tst = AffineTransform()
+    aruco_tracker = aruco_tracker_gen()
+
+    def tabletop_square_matcher(fo):
+        nonlocal tst, aruco_tracker
+        frame = fo.frame
+
+        tags = aruco_tracker(fo)
+
+        # draw lines between tag 0-4
+        tagidx = [0, 1, 2, 3]
+        # tagidx = [0, 1, 10, 9]
+        for i in range(len(tagidx)):
             try:
-                # print(i in tags, (i+1)%4 in tags)
-                p0 = tags[i]
-                p1 = tags[(i+1) % 4]
+                p0 = tags[tagidx[i]]
+                p1 = tags[tagidx[(i+1) % 4]]
             except:
                 continue
             else:
-                # print(i, (i+1)%4)
-                dwsline2p_white(append_draw_function,frame, p0.cxy, p1.cxy)
-
+                fo.draw(lambda p0=p0.cxy,p1=p1.cxy:
+                    dwsline(frame,
+                        (int(p0[0]*8), int(p0[1]*8)),
+                        (int(p1[0]*8), int(p1[1]*8)),
+                        color=(255,255,200), shift=3, thickness=2)
+                )
 
         # find transform from tag 0-4 to unit square
         found = [] # sources
         unit_square = [] # targets
 
-        for i in range(4):
+        for idx, i in enumerate(tagidx):
             if i in tags:
                 found.append(tags[i].cxy)
-                unit_square.append(unit_square_coords[i])
+                unit_square.append(unit_square_coords[idx])
 
+        at = AffineTransform()
         if len(found)>=4:
-            at = AffineTransform()
             at.estimate_from(np.array(found), np.array(unit_square))
             if at.has_solution():
                 tst = at
 
         # draw the transform found by converting a cross into screen space
         if tst.has_solution():
-            append_lines(f'tst has solution')
+            fo.drawtext(f'tst got solution')
             cross_lines = np.array([[[.5,0], [.5,1]], [[0,.5], [1,.5]]])
             cross_lines = tst.transform(cross_lines, inverse=True)
             for p0, p1 in cross_lines:
-                dwsline2p_white(append_draw_function,frame, p0, p1)
+                fo.draw(lambda p0=p0,p1=p1:
+                    dwsline(frame,
+                        (int(p0[0]*8), int(p0[1]*8)),
+                        (int(p1[0]*8), int(p1[1]*8)),
+                        color=(255,255,200), shift=3, thickness=1)
+                )
         else:
-            append_lines('tst no solution')
+            fo.drawtext('tst no solution')
 
         return tags, tst
 
-    return aruco_tracker
+    return tabletop_square_matcher
 
 if __name__ == '__main__':
-    cl = camloop(aruco_tracker_gen(), threaded=True)
+    # cl = camloop(aruco_tracker_gen(), threaded=True)
+    cl = camloop(tabletop_square_matcher_gen(), threaded=True)
 
     while 1:
         cl.update()
