@@ -1,2 +1,3 @@
 *.pyc
 *.db
+table_config.json

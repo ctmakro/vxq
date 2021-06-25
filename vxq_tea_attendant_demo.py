@@ -1,7 +1,10 @@
 from vxq_hid import *
 from arucofun import *
 
-v = VXQHID()
+import sys
+vxq_model = sys.argv[1] if len(sys.argv)>=2 else 'original'
+
+v = VXQHID(configuration=vxq_model)
 
 time.sleep(.5)
 
