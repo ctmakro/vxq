@@ -24,7 +24,7 @@ def move_to_5_and_back():
         # for i in range(4):
         #     v.g1_cartesian_joint(mcrcf[i])
         #     time.sleep(0.5)
-        v.g1_cartesian_joint(side_up, speed=300)
+        v.g1_cartesian_joint(side_up, j1_first=False, speed=250)
         time.sleep(0.5)
 
         if tst is not None and tst.has_solution():
@@ -40,14 +40,32 @@ def move_to_5_and_back():
 
             if at.has_solution():
                 if 5 in tags:
-                    screen = tags[5].cxy
+                    # to the right of tag
+                    t5 = tags[5]
+                    t5r = t5.cxy + t5.rxy * 3.2
+
+                    screen = t5r
+
                     sc = tst.transform(screen) # screen to square
                     rc = at.transform(sc) # square to robot cartesian
 
                     default_height = mcrcf[0][2]
                     try:
                         v.g1_cartesian_joint(
-                            list(rc)+[default_height], speed=200)
+                        # v.g1_cartesian_ik(
+                            list(rc)+[default_height],
+                            j1_first = True,
+                            speed=200,
+                        )
+
+                        # time.sleep(0.5)
+
+                        v.go_j(4, 2000) # 出水
+                        time.sleep(1+3)
+
+                        v.go_j(4, 3000) # 停
+                        time.sleep(2)
+
                     except Exception as e:
                         # point might get out of reach or something
                         print(e)

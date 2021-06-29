@@ -453,7 +453,8 @@ class VXQHID:
         assert len(arr)<=6
 
         # which joints selected?
-        idxes = [i for i,n in enumerate(arr) if n is not None]
+        idxes = [i for i,n in enumerate(arr) if
+            n is not None and not math.isnan(n)]
 
         # current position of each of the joints
         here_joints = self.get_joints()
@@ -481,6 +482,19 @@ class VXQHID:
             self.g0_joint(to_send)
             time.sleep(dt)
 
+    def g1_joint_separated(self, arr, j1_first=None, *a, **k):
+        if j1_first is None:
+            return self.g1_joint(arr, *a, **k)
+
+        midpoint = arr.copy()
+        if j1_first:
+            midpoint[1:] = [None]*len(midpoint[1:])
+        else:
+            midpoint[0] = None
+
+        self.g1_joint(midpoint, *a, **k)
+        self.g1_joint(arr, *a, **k)
+
     # same but use radians as input
     def g1_radians(self, arr, *a, **k):
         return self.g1_joint(self.k.rad2count(arr), *a, **k)
@@ -488,7 +502,7 @@ class VXQHID:
     # move to given cartesian coordinates, all axis in sync, in joint space
     def g1_cartesian_joint(self, coord, *a, **kw):
         targ = self.k.rad2count(self.k.ik(coord[0:3]))
-        return self.g1_joint(targ, *a, **kw)
+        return self.g1_joint_separated(targ, *a, **kw)
 
     # move to given cartesian coordinates, all axis in sync, in cartesian space
     def g1_cartesian_ik_withstart(self, p0, p1, speed=None):
@@ -537,6 +551,8 @@ def vxq_kinematics_gen(
         l2 = 510.; l3 = 640.
     elif configuration in ['shorter', 'mini']:
         l2 = 310.; l3 = 365.
+    elif configuration in ['attendant','daocha','tea']:
+        l2 = 500.; l3 = 710.
     else:
         raise Exception('unknown arm lengths configuration')
 

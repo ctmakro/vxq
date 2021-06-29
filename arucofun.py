@@ -167,6 +167,7 @@ class Detection:
 
         self.cxy = np.sum(corners, 0) * .25
         self.uxy = np.sum(corners[0:2] - corners[2:4], 0) * .5
+        self.rxy = np.sum(corners[1:2:4] - corners[0:2:3], 0) * .5
         self.size = np.sqrt(
             (np.sum(np.square(tl-br)) + np.sum(np.square(tr-bl)))
         )
@@ -411,7 +412,7 @@ class AffineTransform():
     # estimate from a bunch of points
     def estimate_from(self, src, dest):
         retval, inliers = cv.estimateAffine2D(
-            src, dest, ransacReprojThreshold=5, maxIters=2000, refineIters=20)
+            src, dest, ransacReprojThreshold=2, maxIters=2000, refineIters=20)
 
         if not len(retval):
             self.inliers = None
@@ -514,6 +515,18 @@ def tabletop_square_matcher_gen():
                         (int(p1[0]*8), int(p1[1]*8)),
                         color=(255,255,200), shift=3, thickness=2)
                 )
+
+        # draw from center to the right of tag 5
+        if 5 in tags:
+            t5 = tags[5]
+            t5r = t5.cxy + t5.rxy * 3.2
+            fo.draw(lambda:
+                dwsline(frame,
+                    (int(t5r[0]*4), int(t5r[1]*4)),
+                    (int(t5.cxy[0]*4), int(t5.cxy[1]*4)),
+                    color = (255,255,200), shift=2, thickness=2,
+                )
+            )
 
         # find transform from tag 0-4 to unit square
         found = [] # sources
