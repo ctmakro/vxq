@@ -491,8 +491,10 @@ class VXQHID:
             midpoint[1:] = [None]*len(midpoint[1:])
         else:
             midpoint[0] = None
-
+        
         self.g1_joint(midpoint, *a, **k)
+        if j1_first:
+            time.sleep(2)
         self.g1_joint(arr, *a, **k)
 
     # same but use radians as input

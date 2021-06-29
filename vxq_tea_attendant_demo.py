@@ -24,7 +24,7 @@ def move_to_5_and_back():
         # for i in range(4):
         #     v.g1_cartesian_joint(mcrcf[i])
         #     time.sleep(0.5)
-        v.g1_cartesian_joint(side_up, j1_first=False, speed=250)
+        v.g1_cartesian_joint(side_up, j1_first=False, speed=800)
         time.sleep(0.5)
 
         if tst is not None and tst.has_solution():
@@ -55,7 +55,7 @@ def move_to_5_and_back():
                         # v.g1_cartesian_ik(
                             list(rc)+[default_height],
                             j1_first = True,
-                            speed=200,
+                            speed=800,
                         )
 
                         # time.sleep(0.5)
