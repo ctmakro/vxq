@@ -55,10 +55,10 @@ def move_to_5_and_back():
                         # v.g1_cartesian_ik(
                             list(rc)+[default_height],
                             j1_first = True,
-                            speed=800,
+                            speed=600,
                         )
 
-                        # time.sleep(0.5)
+                        time.sleep(1)
 
                         v.go_j(4, 2000) # 出水
                         time.sleep(1+3)
