@@ -28,3 +28,8 @@ def lpn_gen(n = 2, k = 0.8, integerize=False):
         for i in range(n): v = ks[i](v)
         return int(v) if integerize else v
     return update
+
+def run_threaded(f):
+    t = threading.Thread(target=f, daemon=True)
+    t.start()
+    return t

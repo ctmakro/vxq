@@ -158,7 +158,11 @@ class Detection:
         self.update()
 
     def update(self):
-        tl,tr,br,bl = corners = self.corners
+        if not hasattr(self, 'last_corners'):
+            self.corners_lp = lpn_gen(3, 0.8)
+        corners = self.corners_lp(self.corners)
+
+        tl,tr,br,bl = corners
 
         # self.tl = tl
         # self.tr = tr

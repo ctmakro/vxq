@@ -56,6 +56,8 @@ class VXQHID:
         self.start_monitoring_thread()
         self.wait_for_readouts()
 
+        self.cancel_movement = False
+
         # # https://github.com/bitcoin-core/HWI/blob/master/hwilib/devices/trezorlib/transport/hid.py
         # self.hid_version = self.probe_hid_version()
         # print('hid_version:', self.hid_version)
@@ -124,7 +126,7 @@ class VXQHID:
             return hidd
 
         if serial_number is None:
-            for i in range(len(devices)):
+            for i in reversed(range(len(devices))):
                 print(f'serial_number not specified, try #{i} in list of all devices')
                 serial_number = sn_found[i]
                 device = devices[i]
@@ -475,6 +477,8 @@ class VXQHID:
 
         for wp in wps:
             # unpack
+            if self.cancel_movement: break
+
             to_send = [None]*6
             for i,idx in enumerate(idxes):
                 to_send[idx] = wp[i]
@@ -491,7 +495,7 @@ class VXQHID:
             midpoint[1:] = [None]*len(midpoint[1:])
         else:
             midpoint[0] = None
-        
+
         self.g1_joint(midpoint, *a, **k)
         if j1_first:
             time.sleep(2)
@@ -514,6 +518,7 @@ class VXQHID:
         dt = 0.08 # send command every 80 ms
         wps = k.planpath_ik(p0[0:3], p1[0:3], speed=speed, dt=dt)
         for wp in wps:
+            if self.cancel_movement: break
             self.g0_joint(k.rad2count(wp))
             time.sleep(dt)
 
