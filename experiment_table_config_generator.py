@@ -18,11 +18,29 @@ x = float(input())
 print('请输入机器人末端的高度（与J2等高为0，更低、更靠近桌面则为负，默认-100')
 height = float(input() or -100)
 
+
+print('请输入机器人底座中心，与加茶位置的左下角，的Y距离（毫米）')
+home_y = float(input())
+
+print('请输入机器人底座中心，与加茶位置的左下角，的X距离（毫米，在左为负数，在右为正数）')
+home_x = float(input())
+
+print('请输入加茶位置的高度（与J2等高为0，更低、更靠近桌面则为负，默认100')
+home_height = float(input() or 100)
+
+print('请输入移动过程中的保持高度（与J2等高为0，更低、更靠近桌面则为负，默认200')
+move_height = float(input() or 200)
+
 d = {
     0:[x+side, y+side, height],
     1:[x+side, y, height],
     2:[x, y, height],
     3:[x, y+side, height],
+
+
+    'move_height':move_height,
+
+    'home_pos':[home_x, home_y, home_height]
 }
 
 d1 = {str(k):v for k,v in d.items()}

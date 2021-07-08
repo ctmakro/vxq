@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>{{title}}</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+  <body>
+    <div class="container" id="container">
+      {% include 'stuff.html.jinja' %}
+    </div>
+
+    <script type="text/javascript">
+      var print = console.log
+      var cont = document.getElementById('container')
+      cont.addEventListener("mouseup", function(e){
+        var receiver = e.target
+        var cid = receiver.getAttribute('click_id')
+        if (cid){
+          click(parseInt(cid))
+        }
+      })
+
+      var last_html = ''
+      async function update_page(data){
+        resp = await fetch('/update',{
+          method:'POST',
+          headers: {
+            'Content-Type': 'application/json'
+            // 'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body:data?JSON.stringify(data):'{}'
+        })
+
+        if(!resp.ok){
+          console.log('resp not ok', resp.status, resp.statusText)
+          return
+        }
+
+        var t = (await resp.text()).trim()
+        if (t!=last_html){
+          document.getElementById('container').innerHTML = t
+          last_html = t
+        }
+      }
+
+      var waiting = false
+      function click(id){
+        if(waiting){
+          return
+        }
+        waiting = true
+        update_page({id:id})
+        .then(r=>{
+          waiting = false
+        })
+        .catch(r=>{
+          console.error(r)
+          waiting = false
+        })
+      }
+
+      setInterval(()=>click(-1), 200)
+
+    </script>
+  </body>
+</html>

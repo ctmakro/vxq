@@ -1,0 +1,60 @@
+.button {
+    cursor: default;
+    padding: 10px;
+    margin: 5px 10px 5px 0;
+    border: black 1px solid;
+    border-radius: 5px;
+    font-weight: bold;
+    min-width: 40px;
+    min-height: 40px;
+    flex-flow: column;
+    align-items: center;
+    justify-content: center;
+}
+
+
+#container * {
+    display: flex;
+    /* width: 100%; */
+    /* margin: 5px; */
+}
+
+.root {
+    /* display: flex; */
+}
+
+.button.chosen {
+    background: #2b699e;
+    color: white;
+}
+
+
+.button.disabled {
+    opacity: .2;
+}
+
+.root {
+    flex-direction: column;
+    width: 100%;
+    align-items: flex-start;
+}
+
+.feedback {flex-direction: column;color: #ca4747;}
+
+.root > * {
+    margin-left: 5px;
+    margin-right: 5px;
+    /* flex-flow: wrap; */
+    /* flex-flow: wrap; */
+}
+
+.line {}
+
+div#container {
+    width: 100%;
+    margin: auto;
+}
+
+.buttonrow {
+    flex-flow: wrap;
+}

@@ -559,7 +559,8 @@ def vxq_kinematics_gen(
     elif configuration in ['shorter', 'mini']:
         l2 = 310.; l3 = 365.
     elif configuration in ['attendant','daocha','tea']:
-        l2 = 500.; l3 = 710.
+        # l2 = 500.; l3 = 710.
+        l2 = 500.; l3 = 695.
     else:
         raise Exception('unknown arm lengths configuration')
 

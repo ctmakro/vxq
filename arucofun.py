@@ -11,6 +11,9 @@ marker_type = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_50)
 
 nop = lambda x:x
 def camloop(f=nop, threaded=False):
+
+    window_name = 'camfeed'
+
     rh = result_holder = SN()
 
     rh.result = None
@@ -31,8 +34,8 @@ def camloop(f=nop, threaded=False):
     def view_update(): # please call from main thread
         frame = get_frame_if_fresh()
         if frame is not None:
-            cv2.imshow('cam feed', frame)
-            k = cv2.waitKey(1) & 0xff
+            cv2.imshow(window_name, frame)
+            k = cv2.waitKey(10) & 0xff
             if k in [27,ord('q'),ord('f')]:
                 exit()
             else:
@@ -41,6 +44,15 @@ def camloop(f=nop, threaded=False):
             return False
 
     rh.update = view_update
+
+    def view_update_f(f):
+        frame = get_frame_if_fresh()
+        if frame is not None:
+            f(frame)
+        else:
+            return False
+
+    rh.update_f = view_update_f
 
     def actual_loop():
 
@@ -80,6 +92,8 @@ def camloop(f=nop, threaded=False):
                 else:
                     print('too many tries, exiting...')
                     break
+
+            assert frame.shape[0]==480
 
             lines = [] # text lines to draw
             dfs = [] # draw functions
@@ -146,7 +160,7 @@ dwscircle = draw_with_shadow(cv2.circle)
 dwstext = draw_with_shadow(cv2.putText)
 
 arucoParams = ac = cv2.aruco.DetectorParameters_create()
-ac.errorCorrectionRate = 0.9
+# ac.errorCorrectionRate = 0.9
 # ac.aprilTagMaxLineFitMse = 5.0
 
 class Detection:
@@ -414,9 +428,14 @@ class AffineTransform():
         self.inliers, self.mat = None, None
 
     # estimate from a bunch of points
-    def estimate_from(self, src, dest):
+    def estimate_from(self, src, dest, **kv):
+        params = dict(method=cv.RANSAC, ransacReprojThreshold=2, maxIters=2000, )
+        params.update(kv)
+
+
+        # retval, inliers = cv.findHomography(
         retval, inliers = cv.estimateAffine2D(
-            src, dest, ransacReprojThreshold=2, maxIters=2000, refineIters=20)
+            src, dest, **params)
 
         if not len(retval):
             self.inliers = None
@@ -424,8 +443,10 @@ class AffineTransform():
             self.matinv = None
             return
 
+        # print(retval.shape)
         retval = np.append(retval, np.array([[0,0,1]]), axis=0).T
         self.mat = retval
+        # self.mat = retval.T
         self.matinv = np.linalg.inv(self.mat)
         self.inliers = inliers
 
@@ -506,10 +527,10 @@ def tabletop_square_matcher_gen():
         # draw lines between tag 0-4
         tagidx = [0, 1, 2, 3]
         # tagidx = [0, 1, 10, 9]
-        for i in range(len(tagidx)):
+        for p0i, p1i in [(0,1),(1,2),(2,3),(3,0),(0,2),(1,3)]:
             try:
-                p0 = tags[tagidx[i]]
-                p1 = tags[tagidx[(i+1) % 4]]
+                p0 = tags[p0i]
+                p1 = tags[p1i]
             except:
                 continue
             else:
@@ -517,8 +538,22 @@ def tabletop_square_matcher_gen():
                     dwsline(frame,
                         (int(p0[0]*8), int(p0[1]*8)),
                         (int(p1[0]*8), int(p1[1]*8)),
-                        color=(255,255,200), shift=3, thickness=2)
+                        color=(255,255,200), shift=3, thickness=1)
                 )
+
+        # attempt to solve for cross point given 4 points
+        p5xy = None
+        if sum((1 if i in tags else 0 for i in [0,1,2,3]))==4:
+            x1,y1,x3,y3,x2,y2,x4,y4 = [
+                tags[a].cxy[b] for a in [0,1,2,3] for b in [0,1]]
+
+            d = (x1-x2)*(y3-y4) - (y1-y2)*(x3-x4)
+            if d!=0:
+                px = ((x1*y2-y1*x2)*(x3-x4) - (x1-x2)*(x3*y4-y3*x4))/d
+                py = ((x1*y2-y1*x2)*(y3-y4) - (y1-y2)*(x3*y4-y3*x4))/d
+
+                p5xy = np.array([px,py])
+
 
         # draw from center to the right of tag 5
         if 5 in tags:
@@ -541,9 +576,25 @@ def tabletop_square_matcher_gen():
                 found.append(tags[i].cxy)
                 unit_square.append(unit_square_coords[idx])
 
+        if p5xy is not None:
+            # print(p5xy)
+
+            fo.draw(lambda:dwscircle(frame,
+                (int(p5xy[0]), int(p5xy[1])),
+                6,
+                color=(255,50,128),
+                shift=0, shadow=False, thickness=1))
+
+            found.append(p5xy)
+            unit_square.append(np.array([.5, .5]))
+
         at = AffineTransform()
-        if len(found)>=4:
-            at.estimate_from(np.array(found), np.array(unit_square))
+        if len(found)>=5:
+            # force least squares
+            at.estimate_from(np.array(found), np.array(unit_square),
+
+                ransacReprojThreshold=1000, maxIters=0)
+
             if at.has_solution():
                 tst = at
 
@@ -574,6 +625,19 @@ if __name__ == '__main__':
         cl.update()
         # print(cl.result)
         time.sleep(0.1)
+
+    # from tkfun2 import *
+    # tk_imshow = tk_imshow_gen('camfeed')
+
+    # def refresher():
+    #     while 1:
+    #         cl.update_f(lambda frame: tk_imshow(frame))
+    #         time.sleep(0.1)
+
+    # run_threaded(refresher)
+    #
+    # mainloop()
+
 
 def denseflow_gen():
     last_gray = None

@@ -28,11 +28,15 @@ except Exception as e:
     print(f'Error while reading {fn}:',e)
 else:
     q = {}
-    for k in list(j.keys()):
-        q[int(k)] = j[k]
+    # for k in list(j.keys()):
+    for k in [0,1,2,3]:
+        q[int(k)] = j[str(k)]
 
     print(q)
 
     for k in q:
         print(f'override {k} in mcrcf with {q[k]} from {fn}')
         mcrcf[k] = npa(q[k])
+
+    mcrcf['home_pos'] = j['home_pos']
+    mcrcf['move_height'] = j['move_height']

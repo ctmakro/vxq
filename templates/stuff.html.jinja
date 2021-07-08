@@ -1,0 +1,11 @@
+{% macro expand(div, k) %}
+  <div class="{%for c in div.classes%}{{c}} {%endfor%}"
+    {%for k,v in div.d.items()%}{{k}}="{{v}}"{%endfor%}>
+    {{div.text}}
+    {% for i in div.l %}
+      {{expand(i, k+1)}}
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{{expand(items, 0)}}
