@@ -160,6 +160,10 @@ dwscircle = draw_with_shadow(cv2.circle)
 dwstext = draw_with_shadow(cv2.putText)
 
 arucoParams = ac = cv2.aruco.DetectorParameters_create()
+ac.cornerRefinementMethod = cv.aruco.CORNER_REFINE_SUBPIX
+ac.minMarkerPerimeterRate = 0.03
+ac.polygonalApproxAccuracyRate = 0.04
+ac.maxErroneousBitsInBorderRate = 0.6
 # ac.errorCorrectionRate = 0.9
 # ac.aprilTagMaxLineFitMse = 5.0
 
@@ -175,6 +179,7 @@ class Detection:
         if not hasattr(self, 'last_corners'):
             self.corners_lp = lpn_gen(3, 0.8)
         corners = self.corners_lp(self.corners)
+        corners = self.corners
 
         tl,tr,br,bl = corners
 
@@ -285,11 +290,13 @@ def draw_transform_indicator(image, at):
         pwr = 0.8**(len(liness)-i-1)
         c = (bc*pwr).astype('int').tolist()
 
-        for p0,p1 in lines*8.:
-            dwsline(image, (int(p0[0]), int(p0[1])),
-                (int(p1[0]), int(p1[1])),
-                color=c,
-                shift=3, shadow=False, thickness=2)
+        if not np.isnan(np.sum(lines)):
+            for p0,p1 in lines*8.:
+
+                dwsline(image, (int(p0[0]), int(p0[1])),
+                    (int(p1[0]), int(p1[1])),
+                    color=c,
+                    shift=3, shadow=False, thickness=2)
 
 def affine_estimator_gen():
     old_gray = None
@@ -347,7 +354,8 @@ def affine_estimator_gen():
             if len(p0_tracked)>6:
                 interval()
 
-                at = AffineTransform()
+                at = PerspectiveTransform()
+                # at = AffineTransform()
                 at.estimate_from(p0t, p1t)
 
                 if at.has_solution():
@@ -382,7 +390,7 @@ def affine_estimator_gen():
                 fo.draw(lambda:draw_trackpoints(frame, p1t, radius=5, thickness=2))
 
         [fo.drawtext(k) for k in
-            [ss, ts, f'affine estm {int(t_total()*1000)}']]
+            [ss, ts, f'persp estm {int(t_total()*1000)}']]
 
         old_gray = gray
         return result
@@ -429,7 +437,7 @@ class AffineTransform():
 
     # estimate from a bunch of points
     def estimate_from(self, src, dest, **kv):
-        params = dict(method=cv.RANSAC, ransacReprojThreshold=2, maxIters=2000, )
+        params = dict(method=cv.RANSAC and cv.RHO, ransacReprojThreshold=2, maxIters=2000, )
         params.update(kv)
 
 
@@ -437,7 +445,7 @@ class AffineTransform():
         retval, inliers = cv.estimateAffine2D(
             src, dest, **params)
 
-        if not len(retval):
+        if retval is not None and not len(retval):
             self.inliers = None
             self.mat = None
             self.matinv = None
@@ -473,7 +481,48 @@ class AffineTransform():
     def has_solution(self):
         return self.mat is not None
 
+class PerspectiveTransform(AffineTransform):
+    # estimate from a bunch of points
+    def estimate_from(self, src, dest, **kv):
+        params = dict(method=cv.RANSAC and cv.RHO, ransacReprojThreshold=3)
+        params.update(kv)
+
+        retval,inliers = cv.findHomography(
+        # retval, inliers = cv.estimateAffine2D(
+            src, dest, **params)
+
+        if not len(retval):
+            self.inliers = None
+            self.mat = None
+            self.matinv = None
+            return
+
+        self.mat = retval.T
+        self.matinv = np.linalg.inv(self.mat)
+        self.inliers = inliers
+
+    def transform(self, points, inverse=False):
+        # points of shape (n, 2)
+        assert points.shape[-1]==2
+
+        # pad points from (n,2) to (n,3) with ones
+        shape_list = list(points.shape)
+        shape_list[-1]=1 # (n, 1)
+        pad = np.ones(shape_list) # ones of shape (n, 1)
+        points = np.concatenate((points, pad), axis=-1, dtype='float32')
+
+        # do the transform
+        mat = self.mat if not inverse else self.matinv
+        result = np.matmul(points, mat)
+
+        xy = result[...,0:2]
+        w = result[...,2:3]
+        w[w==0] = np.inf
+        return xy/w
+
+
 unit_square_coords = {0:[1,1], 1:[1,0], 2:[0,0], 3:[0,1]}
+unit_square_coords = [[1,1], [1,0], [0,0], [0,1]]
 
 def aruco_tracker_gen():
     ind = {}
@@ -515,7 +564,7 @@ def aruco_tracker_gen():
     return aruco_tracker
 
 def tabletop_square_matcher_gen():
-    tabletop_square_transform = tst = AffineTransform()
+    tabletop_square_transform = tst = PerspectiveTransform()
     aruco_tracker = aruco_tracker_gen()
 
     def tabletop_square_matcher(fo):
@@ -525,12 +574,14 @@ def tabletop_square_matcher_gen():
         tags = aruco_tracker(fo)
 
         # draw lines between tag 0-4
+        # tagidx 指的是，放在桌子上，连接成正方形的，四个标记的编号。通常为 0,1,2,3
+        # 取其他值时仅作测试用。
         tagidx = [0, 1, 2, 3]
-        # tagidx = [0, 1, 10, 9]
+        # tagidx = [22,24,42,40]
         for p0i, p1i in [(0,1),(1,2),(2,3),(3,0),(0,2),(1,3)]:
             try:
-                p0 = tags[p0i]
-                p1 = tags[p1i]
+                p0 = tags[tagidx[p0i]]
+                p1 = tags[tagidx[p1i]]
             except:
                 continue
             else:
@@ -541,31 +592,32 @@ def tabletop_square_matcher_gen():
                         color=(255,255,200), shift=3, thickness=1)
                 )
 
-        # attempt to solve for cross point given 4 points
-        p5xy = None
-        if sum((1 if i in tags else 0 for i in [0,1,2,3]))==4:
-            x1,y1,x3,y3,x2,y2,x4,y4 = [
-                tags[a].cxy[b] for a in [0,1,2,3] for b in [0,1]]
+        if 1:
+            # attempt to solve for cross point given 4 points
+            p5xy = None
+            if sum((1 if i in tags else 0 for i in tagidx))==4:
+                x1,y1,x3,y3,x2,y2,x4,y4 = [
+                    tags[tagidx[a]].cxy[b] for a in [0,1,2,3] for b in [0,1]]
 
-            d = (x1-x2)*(y3-y4) - (y1-y2)*(x3-x4)
-            if d!=0:
-                px = ((x1*y2-y1*x2)*(x3-x4) - (x1-x2)*(x3*y4-y3*x4))/d
-                py = ((x1*y2-y1*x2)*(y3-y4) - (y1-y2)*(x3*y4-y3*x4))/d
+                d = (x1-x2)*(y3-y4) - (y1-y2)*(x3-x4)
+                if d!=0:
+                    px = ((x1*y2-y1*x2)*(x3-x4) - (x1-x2)*(x3*y4-y3*x4))/d
+                    py = ((x1*y2-y1*x2)*(y3-y4) - (y1-y2)*(x3*y4-y3*x4))/d
 
-                p5xy = np.array([px,py])
+                    p5xy = np.array([px,py])
 
 
-        # draw from center to the right of tag 5
-        if 5 in tags:
-            t5 = tags[5]
-            t5r = t5.cxy + t5.rxy * 3.2
-            fo.draw(lambda:
-                dwsline(frame,
-                    (int(t5r[0]*4), int(t5r[1]*4)),
-                    (int(t5.cxy[0]*4), int(t5.cxy[1]*4)),
-                    color = (255,255,200), shift=2, thickness=2,
-                )
-            )
+        # # draw from center to the right of tag 5
+        # if 5 in tags:
+        #     t5 = tags[5]
+        #     t5r = t5.cxy + t5.rxy * 3.2
+        #     fo.draw(lambda:
+        #         dwsline(frame,
+        #             (int(t5r[0]*4), int(t5r[1]*4)),
+        #             (int(t5.cxy[0]*4), int(t5.cxy[1]*4)),
+        #             color = (255,255,200), shift=2, thickness=2,
+        #         )
+        #     )
 
         # find transform from tag 0-4 to unit square
         found = [] # sources
@@ -576,24 +628,25 @@ def tabletop_square_matcher_gen():
                 found.append(tags[i].cxy)
                 unit_square.append(unit_square_coords[idx])
 
-        if p5xy is not None:
-            # print(p5xy)
+        # if p5xy is not None:
+        #     # print(p5xy)
+        #
+        #     fo.draw(lambda:dwscircle(frame,
+        #         (int(p5xy[0]), int(p5xy[1])),
+        #         6,
+        #         color=(255,50,128),
+        #         shift=0, shadow=False, thickness=1))
+        #
+        #     found.append(p5xy)
+        #     unit_square.append(np.array([.5, .5]))
 
-            fo.draw(lambda:dwscircle(frame,
-                (int(p5xy[0]), int(p5xy[1])),
-                6,
-                color=(255,50,128),
-                shift=0, shadow=False, thickness=1))
-
-            found.append(p5xy)
-            unit_square.append(np.array([.5, .5]))
-
-        at = AffineTransform()
-        if len(found)>=5:
+        at = PerspectiveTransform()
+        # at = AffineTransform()
+        if len(found)>=4:
             # force least squares
             at.estimate_from(np.array(found), np.array(unit_square),
-
-                ransacReprojThreshold=1000, maxIters=0)
+            # at.estimate_from(np.array(unit_square), np.array(found),
+            method=0)
 
             if at.has_solution():
                 tst = at
@@ -601,14 +654,33 @@ def tabletop_square_matcher_gen():
         # draw the transform found by converting a cross into screen space
         if tst.has_solution():
             fo.drawtext(f'tst got solution')
-            cross_lines = np.array([[[.5,0], [.5,1]], [[0,.5], [1,.5]]])
+
+            for i in range(3):
+                for j in range(3):
+                    new_p = tst.transform(np.array([i,j])/2, inverse=True)
+
+                    fo.draw(lambda p1=new_p:
+                        dwscircle(frame,
+                            (int(p1[0]), int(p1[1])),
+                            6,
+                            color=(255,50,128),
+                            shift=0, shadow=False, thickness=2)
+                    )
+
+            cross_lines = np.array([[[.5,0.], [.5,1.]], [[0.,.5], [1.,.5]]])
             cross_lines = tst.transform(cross_lines, inverse=True)
-            for p0, p1 in cross_lines:
-                fo.draw(lambda p0=p0,p1=p1:
+            for p0k, p1k in cross_lines:
+                fo.draw(lambda p0=p0k,p1=p1k:
                     dwsline(frame,
-                        (int(p0[0]*8), int(p0[1]*8)),
-                        (int(p1[0]*8), int(p1[1]*8)),
-                        color=(255,255,200), shift=3, thickness=1)
+                        (int(p0[0]), int(p0[1])),
+                        (int(p1[0]), int(p1[1])),
+                        color=(255,200,220), shift=0, thickness=1) or
+
+                    dwscircle(frame,
+                        (int(p0[0]), int(p0[1])),
+                        12,
+                        color=(255,50,128),
+                        shift=0, shadow=False, thickness=2)
                 )
         else:
             fo.drawtext('tst no solution')
