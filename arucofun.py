@@ -55,11 +55,33 @@ def camloop(f=nop, threaded=False):
     rh.update_f = view_update_f
 
     def actual_loop():
+        def try_open_camera(id):
+            cap = cv2.VideoCapture(id)
 
-        cap = cv2.VideoCapture(1)
-        if not cap.isOpened():
-            print("Cannot open camera")
-            exit()
+            height = cap.get(4)
+            width = cap.get(3)
+            print('height:', height, 'width:', width)
+
+            if not cap.isOpened():
+                print("Cannot open camera", id)
+                return False
+
+            if height==720:
+                print('frame height 720(apple webcam), not the one we want')
+                return False
+
+            # if height==1080:
+            #     cap.set(3,1280)
+            #     cap.set(4,720)
+
+            return cap
+            # raise Exception('frame height not 480')
+
+        cap = try_open_camera(1)
+        if not cap:
+            cap = try_open_camera(0)
+        if not cap:
+            raise Exception('cannot open any of the cameras')
 
         # cap.set(cv.CAP_PROP_FRAME_WIDTH,320);
         # cap.set(cv.CAP_PROP_FRAME_HEIGHT,240);
@@ -86,14 +108,16 @@ def camloop(f=nop, threaded=False):
             if not ret:
                 fail_counter+=1
                 print(f"Can't receive frame (stream end?) {fail_counter}")
-                if fail_counter<3:
+                if fail_counter<20:
                     time.sleep(.5)
                     continue
                 else:
                     print('too many tries, exiting...')
                     break
 
-            assert frame.shape[0]==480
+            h,w = frame.shape[0:2]
+            if w>640*2:
+                frame = cv2.pyrDown(frame)
 
             lines = [] # text lines to draw
             dfs = [] # draw functions
@@ -528,8 +552,12 @@ def aruco_tracker_gen():
     ind = {}
     ae = affine_estimator_gen()
 
+    flip = 0
+
     def aruco_tracker(fo):
-        nonlocal ind, ae
+        nonlocal ind, ae, flip
+
+        flip = (flip+1)%3
         frame = fo.frame
 
         interval = interval_gen()
@@ -537,8 +565,11 @@ def aruco_tracker_gen():
         transform = ae(fo)
 
         interval()
-        dd, dl = detect(frame)
-        fo.drawtext(f'mrkr det in {int(interval()*1000)}')
+        if flip==0:
+            dd, dl = detect(frame)
+            fo.drawtext(f'mrkr det in {int(interval()*1000)}')
+        else:
+            dd = {}
 
         if transform is not None:
             to_interp = {}

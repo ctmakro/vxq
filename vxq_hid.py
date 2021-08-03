@@ -560,7 +560,8 @@ def vxq_kinematics_gen(
         l2 = 310.; l3 = 365.
     elif configuration in ['attendant','daocha','tea']:
         # l2 = 500.; l3 = 710.
-        l2 = 500.; l3 = 695.
+        # l2 = 500.; l3 = 695.
+        l2 = 660; l3 = 690
     else:
         raise Exception('unknown arm lengths configuration')
 
@@ -593,15 +594,17 @@ def vxq_kinematics_gen(
     rad_per_count = 1 / 1024 * r90 # 1024 count per 90 deg
     count_per_rad = 1 / rad_per_count
 
+    def c2r(j):
+        return (j-neutral) * rad_per_count
+
     # convert encoder count to radians
     def count2rad(joints):
-        def c2r(j):
-            return (j-neutral) * rad_per_count
-
         j = joints
 
         # angle definitions: refer to Qin's hand drawing
-        a1 = - c2r(j[0]) + r90
+        # a1 = - c2r(j[0]) + r90 # old definition
+        a1 = c2r(j[0]) + r90
+
         # a2 = c2r(j[1]) + r90 # old definition
         a2 = -c2r(j[1]) + r90 # per 20's definition
         a3 = c2r(j[2]) + r180
@@ -614,16 +617,17 @@ def vxq_kinematics_gen(
 
         return np.array([a1, a2, a3, a4, a5, a6], dtype='float32')
 
+    def r2c(r):
+        c = (r * count_per_rad + neutral)
+        if c>=4096: c-=4096
+        if c<0: c+=4096
+        return c
+
     # back
     def rad2count(rads):
-        def r2c(r):
-            c = (r * count_per_rad + neutral)
-            if c>=4096: c-=4096
-            if c<0: c+=4096
-            return c
-
         r = rads
-        j1 = r2c(-r[0] + r90)
+        # j1 = r2c(-r[0] + r90) # old definition
+        j1 = r2c(r[0] - r90)
         # j2 = r2c(r[1] - r90) # old definition
         j2 = r2c(-r[1] + r90) # per 20's definition
         j3 = r2c(r[2] - r180)
