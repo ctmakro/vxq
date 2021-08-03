@@ -117,7 +117,9 @@ def camloop(f=nop, threaded=False):
 
             h,w = frame.shape[0:2]
             if w>640*2:
-                frame = cv2.pyrDown(frame)
+                frame = cv2.resize(frame, (w//2,h//2),
+                    interpolation=cv2.INTER_NEAREST)
+                # frame = cv2.pyrDown(frame)
 
             lines = [] # text lines to draw
             dfs = [] # draw functions
@@ -623,7 +625,7 @@ def tabletop_square_matcher_gen():
                         color=(255,255,200), shift=3, thickness=1)
                 )
 
-        if 1:
+        if 0:
             # attempt to solve for cross point given 4 points
             p5xy = None
             if sum((1 if i in tags else 0 for i in tagidx))==4:
@@ -686,14 +688,15 @@ def tabletop_square_matcher_gen():
         if tst.has_solution():
             fo.drawtext(f'tst got solution')
 
-            for i in range(3):
-                for j in range(3):
-                    new_p = tst.transform(np.array([i,j])/2, inverse=True)
+            ns = nsplits = 5
+            for i in range(ns):
+                for j in range(ns):
+                    new_p = tst.transform(np.array([i,j])/(ns-1), inverse=True)
 
                     fo.draw(lambda p1=new_p:
                         dwscircle(frame,
                             (int(p1[0]), int(p1[1])),
-                            6,
+                            5,
                             color=(255,50,128),
                             shift=0, shadow=False, thickness=2)
                     )
