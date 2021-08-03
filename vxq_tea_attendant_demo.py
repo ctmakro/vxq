@@ -19,7 +19,11 @@ tag_combinations = {
 # left_tag(always reveal): right_tag(may be covered by tea cup)
  48:49,
  46:47,
- 5:4,
+ 44:45,
+ 42:43,
+ 40:41,
+ 38:39,
+ 36:37,
 }
 
 finish_adding_tea = {}
@@ -152,7 +156,9 @@ def try_move_to_5(target=5):
                 sc = tst.transform(screen) # screen to square
                 rc = at.transform(sc) # square to robot cartesian
 
-                default_height = mcrcf[0][2]
+                default_height = -90
+                #default_height = mcrcf[0][2]
+                #倒茶高度
 
                 # let's move! but from another thread...
                 def go_pour_tea():
