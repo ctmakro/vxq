@@ -129,7 +129,7 @@ def try_move_to_5(target=5):
 
     # if camera to square coords solution exists
     if tst is not None and tst.has_solution():
-        at = AffineTransform()
+        at = PerspectiveTransform()
 
         # try to get solution from camera to table coords
         usc_l = np.array([unit_square_coords[i] for i in range(4)])
