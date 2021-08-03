@@ -2,7 +2,7 @@ import cv2
 cv = cv2
 import numpy as np
 from types import SimpleNamespace as SN
-import time, sys, threading
+import time, sys, threading, math
 from utils import *
 
 # some love from https://www.pyimagesearch.com/2020/12/21/detecting-aruco-markers-with-opencv-and-python/
@@ -123,7 +123,7 @@ def camloop(f=nop, threaded=False):
             h,w = frame.shape[0:2]
             if w>640*2:
                 frame = cv2.resize(frame, (w//2,h//2),
-                    interpolation=cv2.INTER_NEAREST)
+                    interpolation=cv2.INTER_CUBIC)
                 # frame = cv2.pyrDown(frame)
 
             lines = [] # text lines to draw
@@ -221,7 +221,11 @@ class Detection:
 
         self.cxy = np.sum(corners, 0) * .25
         self.uxy = np.sum(corners[0:2] - corners[2:4], 0) * .5
-        self.rxy = np.sum(corners[1:2:4] - corners[0:2:3], 0) * .5
+        self.rxy = np.sum(corners[1:2:4] - corners[0:2:3], 0) * 1
+        self.rexy = self.cxy + self.rxy * 1.75
+        # self.rexy = self.cxy + self.rxy * 0
+        self.uexy = self.cxy + self.uxy * 1
+
         self.size = np.sqrt(
             (np.sum(np.square(tl-br)) + np.sum(np.square(tr-bl)))
         )
@@ -429,24 +433,34 @@ def affine_estimator_gen():
     return affine_estimator
 
 # camloop(affine_estimator_gen())
-
 def mark_detections(image, detection_l):
     for v in detection_l:
 
-        cxy,uxy,size = v.cxy, v.uxy, v.size
-        uexy = cxy + uxy
+        cxy,uxy,rxy,size = v.cxy, v.uxy, v.rxy, v.size
+        uexy = v.uexy
+        # rexy = cxy + rxy*1.75
+        rexy = v.rexy
         iage = v.iage
 
-        cx,cy,uex,uey = int(cxy[0]), int(cxy[1]), int(uexy[0]), int(uexy[1])
+        cx,cy,uex,uey,rex,rey= round(cxy[0]), round(cxy[1]), \
+            round(uexy[0]), round(uexy[1]),\
+            round(rexy[0]), round(rexy[1])
 
-        iagec = int(np.clip(iage*20, 0, 255))
+        iagec = round(np.clip(iage*20, 0, 255))
 
-        dwscircle(image, (cx, cy), int(size*0.2),
+        dwscircle(image, (cx, cy), round(size*0.2),
             color=(200,200,50) if iage else (50,255,255) , shift=0, thickness=2, shadow=False)
 
-
+        redgreen = (0,255-iagec,iagec)
         dwsline(image, (cx, cy), (uex, uey),
-            color=(0,255-iagec,iagec), shift=0, thickness=2, shadow=False)
+            color=redgreen, shift=0, thickness=2, shadow=False)
+
+        # small cross
+        cl = round(.5*size)
+        dwsline(image, (rex, rey+cl), (rex, rey-cl),
+            color=redgreen, shift=0, thickness=1, shadow=False)
+        dwsline(image, (rex+cl, rey), (rex-cl, rey),
+            color=redgreen, shift=0, thickness=1, shadow=False)
 
         dwstext(image, str(v.marker_id),
             (cx, cy-20), cv2.FONT_HERSHEY_SIMPLEX,
@@ -721,6 +735,17 @@ def tabletop_square_matcher_gen():
                         color=(255,50,128),
                         shift=0, shadow=False, thickness=2)
                 )
+
+            # compensate perspective error
+            for k in [] and tags:
+                tag = tags[k]
+
+                # back transform
+                trans_corners = tst.transform(tag.corners, inverse=True)
+                newtag = Detection('99',trans_corners)
+                tag.rexy = tst.transform(newtag.rexy)
+                tag.uexy = tst.transform(newtag.uexy)
+
         else:
             fo.drawtext('tst no solution')
 

@@ -449,7 +449,7 @@ class VXQHID:
         return self.go(arr)
 
     # move to given encoder counts, all axis in sync, in joint space
-    def g1_joint(self, arr, speed=None):
+    def g1_joint(self, arr, speed=None, start=None):
         self.speed = speed = speed or self.speed
 
         assert len(arr)<=6
@@ -460,6 +460,10 @@ class VXQHID:
 
         # current position of each of the joints
         here_joints = self.get_joints()
+        if start is not None:
+            for idx, i in enumerate(start):
+                if i is not None and not math.isnan(i):
+                    here_joints[idx]=i
 
         # pack
         targ_relevant = npa([arr[idx] for idx in idxes])
@@ -486,9 +490,9 @@ class VXQHID:
             self.g0_joint(to_send)
             time.sleep(dt)
 
-    def g1_joint_separated(self, arr, j1_first=None, *a, **k):
+    def g1_joint_separated(self, arr, j1_first=None, start=None, *a, **k):
         if j1_first is None:
-            return self.g1_joint(arr, *a, **k)
+            return self.g1_joint(arr, start=start, *a, **k)
 
         midpoint = arr.copy()
         if j1_first:
@@ -496,19 +500,22 @@ class VXQHID:
         else:
             midpoint[0] = None
 
-        self.g1_joint(midpoint, *a, **k)
+        self.g1_joint(midpoint, start=start, *a, **k)
         if j1_first:
-            time.sleep(2)
-        self.g1_joint(arr, *a, **k)
+            time.sleep(1)
+
+        self.g1_joint(arr, start=midpoint, *a, **k)
 
     # same but use radians as input
     def g1_radians(self, arr, *a, **k):
         return self.g1_joint(self.k.rad2count(arr), *a, **k)
 
     # move to given cartesian coordinates, all axis in sync, in joint space
-    def g1_cartesian_joint(self, coord, *a, **kw):
+    def g1_cartesian_joint(self, coord, start=None, *a, **kw):
         targ = self.k.rad2count(self.k.ik(coord[0:3]))
-        return self.g1_joint_separated(targ, *a, **kw)
+        if start is not None:
+            start = self.k.rad2count(self.k.ik(start[0:3]))
+        return self.g1_joint_separated(targ, start=start, *a, **kw)
 
     # move to given cartesian coordinates, all axis in sync, in cartesian space
     def g1_cartesian_ik_withstart(self, p0, p1, speed=None):
@@ -523,9 +530,13 @@ class VXQHID:
             time.sleep(dt)
 
     # same but only specify end point
-    def g1_cartesian_ik(self, p1, *a, **kw):
-        here_joints = self.get_joints()
-        p0 = self.k.fk(here_joints[0:3])
+    def g1_cartesian_ik(self, p1, start=None, *a, **kw):
+        if start is None:
+            here_joints = self.get_joints()
+            p0 = self.k.fk(self.k.count2rad(here_joints[0:3]))
+        else:
+            p0 = np.array(start)
+
         return self.g1_cartesian_ik_withstart(p0, p1, *a, **kw)
 
     # string describing joints and fk cartesian coords.
@@ -701,6 +712,7 @@ def vxq_kinematics_gen(
         x,y,z = target_coords
 
         if y<=0:
+            print('xyz',x,y,z)
             raise Exception('target coordinate y < 0 (back of machine)')
 
         a1 = np.arctan2(y,x)
