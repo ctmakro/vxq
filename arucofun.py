@@ -56,7 +56,10 @@ def camloop(f=nop, threaded=False):
 
     def actual_loop():
         def try_open_camera(id):
-            cap = cv2.VideoCapture(id)
+            if sys.platform == 'win32':
+                cap = cv2.VideoCapture(id, cv2.CAP_DSHOW)
+            else:
+                cap = cv2.VideoCapture(id, cv2.CAP_ANY)
 
             height = cap.get(4)
             width = cap.get(3)
@@ -536,7 +539,7 @@ class PerspectiveTransform(AffineTransform):
         # retval, inliers = cv.estimateAffine2D(
             src, dest, **params)
 
-        if not len(retval):
+        if retval is None or not len(retval):
             self.inliers = None
             self.mat = None
             self.matinv = None
