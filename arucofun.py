@@ -71,8 +71,13 @@ def camloop(f=nop, threaded=False):
                 return False
 
             # if height==1080:
-            #     cap.set(3,1280)
-            #     cap.set(4,720)
+            # attempt to use maximum resolution
+            cap.set(3,1920)
+            cap.set(4,1080)
+
+            height = cap.get(4)
+            width = cap.get(3)
+            print('height:', height, 'width:', width)
 
             return cap
             # raise Exception('frame height not 480')
@@ -138,7 +143,7 @@ def camloop(f=nop, threaded=False):
             ts+=f'df() {lps[2](watch())} '
 
             lines.insert(0, ts)
-            lines.insert(0, f'fps{int(fps):3d}')
+            lines.insert(0, f'{frame.shape[0:2]} fps{int(fps):3d}')
 
             for idx, s in enumerate(lines):
                 dwstext(frame, s,
