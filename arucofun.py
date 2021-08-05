@@ -124,6 +124,8 @@ def camloop(f=nop, threaded=False):
                     break
 
             h,w = frame.shape[0:2]
+
+            # smaller image for ease of processing
             if w>640*2:
                 frame = cv2.resize(frame, (w//2,h//2),
                     interpolation=cv2.INTER_CUBIC)
@@ -350,9 +352,16 @@ def affine_estimator_gen():
                       maxLevel = 10,
                       criteria = (cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 20, 0.01))
 
+    # camera distortion
+    from camera_calibration import chessboard_finder_gen
+    chessboard_finder = chessboard_finder_gen()
+
     def affine_estimator(fo):
         nonlocal old_gray
         frame = fo.frame
+
+        # deal with camera calibration/ undistortion
+        chessboard_finder(fo)
 
         result = None
 
@@ -459,7 +468,7 @@ def mark_detections(image, detection_l):
             color=redgreen, shift=0, thickness=2, shadow=False)
 
         # small cross
-        cl = round(.5*size)
+        cl = round(.3*size)
         dwsline(image, (rex, rey+cl), (rex, rey-cl),
             color=redgreen, shift=0, thickness=1, shadow=False)
         dwsline(image, (rex+cl, rey), (rex-cl, rey),
