@@ -132,6 +132,10 @@ def chessboard_finder_gen():
         else:
             look_for_board = True
 
+        interval = interval_gen()
+
+        interval()
+
         if look_for_board:
             retval, corners = cv.findChessboardCornersSB(
                 frame,
@@ -271,9 +275,10 @@ def chessboard_finder_gen():
 
 
         if cm is None or dc is None or ncm is None:
-            fo.drawtext('camera not calibrated')
+            fo.drawtext(f'camera not calibrated {int(interval()*1000)}')
+
         else:
-            fo.drawtext('camera calibrated')
+            fo.drawtext(f'camera calibrated in  {int(interval()*1000)}')
 
             ud = cv.undistort(frame, cm, dc, newCameraMatrix=ncm)
             fo.frame[:] = ud[:] # force write

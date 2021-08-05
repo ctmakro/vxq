@@ -603,6 +603,7 @@ def aruco_tracker_gen():
             fo.drawtext(f'mrkr det in {int(interval()*1000)}')
         else:
             dd = {}
+            fo.drawtext(f'mrkr not in {int(interval()*1000)}')
 
         if transform is not None:
             to_interp = {}
