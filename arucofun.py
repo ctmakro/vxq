@@ -57,9 +57,13 @@ def camloop(f=nop, threaded=False):
     def actual_loop():
         def try_open_camera(id):
             if sys.platform == 'win32':
-                cap = cv2.VideoCapture(id, cv2.CAP_DSHOW)
+                cap = cv2.VideoCapture(id,
+                # cv2.CAP_DSHOW,
+                cv2.CAP_MSMF,
+                params=(3,1920,4,1080))
             else:
-                cap = cv2.VideoCapture(id, cv2.CAP_ANY)
+                cap = cv2.VideoCapture(id, cv2.CAP_ANY,
+                params=(3,1920,4,1080))
 
             height = cap.get(4)
             width = cap.get(3)
@@ -72,15 +76,6 @@ def camloop(f=nop, threaded=False):
             if height==720:
                 print('frame height 720(apple webcam), not the one we want')
                 return False
-
-            # if height==1080:
-            # attempt to use maximum resolution
-            cap.set(3,1920)
-            cap.set(4,1080)
-
-            height = cap.get(4)
-            width = cap.get(3)
-            print('height:', height, 'width:', width)
 
             return cap
             # raise Exception('frame height not 480')
@@ -128,7 +123,9 @@ def camloop(f=nop, threaded=False):
             # smaller image for ease of processing
             if w>640*2:
                 frame = cv2.resize(frame, (w//2,h//2),
-                    interpolation=cv2.INTER_CUBIC)
+                    # interpolation=cv2.INTER_NEAREST)
+                    interpolation=cv2.INTER_LINEAR)
+                    # interpolation=cv2.INTER_CUBIC)
                 # frame = cv2.pyrDown(frame)
 
             lines = [] # text lines to draw
