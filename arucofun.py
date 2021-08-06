@@ -421,7 +421,7 @@ def draw_transform_indicator(image, at):
                     color=c,
                     shift=3, shadow=False, thickness=2)
 
-def affine_estimator_gen():
+def affine_estimator_gen(skip = False):
     old_gray = None
 
     # params for ShiTomasi corner detection
@@ -446,6 +446,8 @@ def affine_estimator_gen():
 
         # deal with camera calibration/ undistortion
         chessboard_finder(fo)
+        if skip:
+            return None
 
         frame = fo.frame
 
@@ -675,8 +677,7 @@ unit_square_coords = [[1,1], [1,0], [0,0], [0,1]]
 
 def aruco_tracker_gen():
     ind = {}
-    # ae = affine_estimator_gen()
-    ae = None
+    ae = affine_estimator_gen(skip=True)
 
     flip = 0
 
@@ -688,8 +689,7 @@ def aruco_tracker_gen():
 
         interval = interval_gen()
 
-        # transform = ae(fo)
-        transform = None
+        transform = ae(fo)
 
         interval()
         if flip==0:
