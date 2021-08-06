@@ -9,6 +9,8 @@ from utils import *
 
 from shelftest import get_shelf
 
+from functools import lru_cache
+
 data = get_shelf()
 print('data:', list(data.keys()))
 
@@ -33,81 +35,69 @@ def draw_chessboard_corners(frameobj, corners):
             color=c,
             shadow=True, thickness=2))
 
+@lru_cache()
+def generate_image_grids(h, w):
+    ch, cw = h//2, w//2
+
+    k = 80
+
+    sh = ch - ((h-ch) // k +1) * k
+    sw = cw - ((w-cw) // k +1) * k
+
+    eh = ch + ((h-ch) // k +1) * k
+    ew = cw + ((w-cw) // k +1) * k
+
+    l = []
+    for i in range(sw, ew+1, k):
+        for j in range(sh, eh+1, k):
+            x = i
+            y = j
+
+            l.append([[x-k*.5,y], [x,y]])
+            l.append([[x,y], [x+k*.5,y]])
+            l.append([[x,y], [x,y+k*.5]])
+            l.append([[x,y-k*.5], [x,y]])
+
+    return np.array(l, dtype='float32')
+
 lastcm = None
-last_l = None
 last_tl = None
+
 def draw_grid_distorted(fo, cm, dc, ncm):
-    global lastcm, last_tl, last_l
+    global lastcm, last_tl
 
     frame = fo.frame
 
     from arucofun import dwsline
 
-    if last_l is None:
-        h, w = frame.shape[0:2]
-        ch, cw = h//2, w//2
-
-        k = 80
-
-        sh = ch - ((h-ch) // k +1) * k
-        sw = cw - ((w-cw) // k +1) * k
-
-        eh = ch + ((h-ch) // k +1) * k
-        ew = cw + ((w-cw) // k +1) * k
-
-        l = []
-        for i in range(sw, ew+1, k):
-            for j in range(sh, eh+1, k):
-                x = i
-                y = j
-
-                l.append([[x-k*.5,y], [x,y]])
-                l.append([[x,y], [x+k*.5,y]])
-                l.append([[x,y], [x,y+k*.5]])
-                l.append([[x,y-k*.5], [x,y]])
-
-        last_l = l
-    else:
-        l = last_l
-
-            #(n, 2, 2)
+    h, w = frame.shape[0:2]
+    l = generate_image_grids(h,w) #(n, 2, 2)
 
     if cm is not None:
         if (lastcm is not None) and ((cm-lastcm).mean()==0) and (last_tl is not None):
             l = last_tl
         else:
-
-            l = np.array(l, dtype='float64')
-            l.shape = l.shape[0] * 2, l.shape[2]
-
-            nl = l.copy()
-            # # nl3d = cv.convertPointsToHomogeneous(nl)
-            # map1, map2 = cv.initUndistortRectifyMap(cm, dc, None, cm,
-            #     (w,h), cv.CV_32FC1)
-            #
-            # nl[:,0] = map1.at(nl[:,0])
-            # nl[:,1] = map2.at(nl[:,1])
-            #
-            # # nldist,jacobian = cv.projectPoints(nl3d, (0,0,0),(0,0,0), cm, dc)
-            # # nl = nldist
-            nl = cv.undistortPoints(nl, cm, dc, P=ncm)
-
-            nl.shape = nl.shape[0]//2, 2, 2
+            l = l.reshape(-1, 2)
+            nl = cv.undistortPoints(l, cm, dc, P=ncm)
+            nl = nl.reshape(-1, 2, 2)
             l = (nl*4).round().astype('int32')
 
             last_tl = l
             lastcm = cm
 
+            print('undistort grid points')
+
     else:
         if last_tl is None:
             last_tl = (l*4).round().astype('int32')
+            print('mul4')
         l = last_tl
 
     c = (128,128,128)
     for p1, p2 in l:
         cv2.line(frame, p1, p2,
             thickness=1, color=c, shift=2,
-            # lineType=cv2.LINE_AA,
+            lineType=cv2.LINE_AA,
             )
 
 # https://github.com/Abhijit-2592/camera_calibration_API

@@ -11,6 +11,35 @@ from utils import *
 
 marker_type = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_50)
 
+class MailWaiter:
+    def __init__(self):
+        self.cond = threading.Condition()
+        self.mail = None
+
+    def send(self, mail):
+        with self.cond:
+            self.mail = mail
+            self.cond.notify()
+
+    def recv(self):
+        while 1:
+            # with flock:
+            tt = 0.0
+            dt = 0.5
+
+            with self.cond:
+                if self.cond.wait(dt):
+                    mail = self.mail
+                    self.mail = None
+                    return mail
+                else:
+                    tt+=dt
+                    print(f'MailWaiter waited for {tt:.1f}s')
+                    dt*=2
+
+    def gotmail(self):
+        return self.mail is not None
+
 nop = lambda x:x
 def camloop(f=nop, threaded=False):
 
@@ -19,42 +48,33 @@ def camloop(f=nop, threaded=False):
     rh = result_holder = SN()
 
     rh.result = None
-    rh.frame = None
-    rh.fresh = False
-
-    def get_frame_if_fresh():
-        rf = None
-
-        if rh.fresh:
-            rh.fresh = False
-            rf = rh.frame
-
-        return rf
-
-    rh.get_frame = get_frame_if_fresh
+    # rh.frame = None
+    rh.framebuffer = MailWaiter()
 
     def view_update(): # please call from main thread
-        frame = get_frame_if_fresh()
-        if frame is not None:
-            cv2.imshow(window_name, frame)
-            k = cv2.waitKey(10) & 0xff
-            if k in [27,ord('q'),ord('f')]:
-                exit()
-            else:
-                return True
-        else:
-            return False
+        fresh = False
+
+        if rh.framebuffer.gotmail():
+            frameobj = rh.framebuffer.recv()
+            cv2.imshow(window_name, frameobj.frame)
+            fresh = True
+
+        k = cv2.waitKey(5) & 0xff
+        if k in [27,ord('q'),ord('f')]:
+            exit()
+
+        return fresh
 
     rh.update = view_update
 
-    def view_update_f(f):
-        frame = get_frame_if_fresh()
-        if frame is not None:
-            f(frame)
-        else:
-            return False
-
-    rh.update_f = view_update_f
+    # def view_update_f(f):
+    #     frame = get_frame_if_fresh()
+    #     if frame is not None:
+    #         f(frame)
+    #     else:
+    #         return False
+    #
+    # rh.update_f = view_update_f
 
     def actual_loop():
         def try_open_camera(id):
@@ -96,7 +116,7 @@ def camloop(f=nop, threaded=False):
             be = cap.getBackendName()
 
             print('height:', height, 'width:', width, 'backend:', be)
-            
+
             return cap
             # raise Exception('frame height not 480')
 
@@ -113,34 +133,62 @@ def camloop(f=nop, threaded=False):
         fpslp = lpn_gen(3, 0.6)
         get_fps_interval = interval_gen()
 
-        lps = [lpn_gen(3, 0.6, integerize=True) for i in range(4)]
+        lps = [lpn_gen(3, 0.6, integerize=True) for i in range(6)]
 
         fail_counter = 0
+        framebuffer = MailWaiter()
+        # flock = threading.Lock()
+        # fcond = threading.Condition()
+        # framefresh = False
+
+        t_read = 0
+        fps = 0
+
+        # read frames from camera nonstop
+        def loop_reader():
+            nonlocal fail_counter, fps, t_read,framebuffer
+
+            while 1:
+                delta = get_fps_interval()
+                fps = 1/max(fpslp(delta),1e-3)
+
+                timer = interval_gen(1000)
+                ret, frame = cap.read()
+                t_read = timer()
+
+
+                if not ret:
+                    fail_counter+=1
+                    print(f"Can't receive frame (stream end?) {fail_counter}")
+                    if fail_counter<20:
+                        time.sleep(.5)
+                        continue
+                    else:
+                        print('too many tries, exiting...')
+                        break
+
+                else:
+                    # got new frame from camera
+                    framebuffer.send(frame)
+
+            exit()
+
+        # threaded read to maximize fps
+        threading.Thread(target=loop_reader, daemon=True).start()
+        t_drawtext = 0
+        t_total = 0
 
         while 1:
-            delta = get_fps_interval()
-            fps = 1/max(fpslp(delta),1e-3)
+            frame = framebuffer.recv()
 
-            watch = interval_gen(1000)
+            watch_tot = interval_gen(1000)
+
             timing_string = ts = ''
 
-            ret, frame = cap.read()
-
-            ts+=f'read() {lps[0](watch())} '
-
-            if not ret:
-                fail_counter+=1
-                print(f"Can't receive frame (stream end?) {fail_counter}")
-                if fail_counter<20:
-                    time.sleep(.5)
-                    continue
-                else:
-                    print('too many tries, exiting...')
-                    break
+            watch2 = interval_gen(1000)
 
             h,w = frame.shape[0:2]
 
-            watch2 = interval_gen(1000)
             # smaller image for ease of processing
             if w>640*2:
                 frame = cv2.resize(frame, (w//2,h//2),
@@ -148,6 +196,7 @@ def camloop(f=nop, threaded=False):
                     # interpolation=cv2.INTER_LINEAR)
                     interpolation=cv2.INTER_CUBIC)
                 # frame = cv2.pyrDown(frame)
+
             downsampling_t = watch2()
 
             lines = [] # text lines to draw
@@ -158,17 +207,21 @@ def camloop(f=nop, threaded=False):
             frameobj.draw = lambda f:dfs.append(f)
             frameobj.drawtext = lambda l: lines.append(l)
 
+            watch = interval_gen(1000)
             result = f(frameobj)
-            ts+=f'f() {lps[1](watch())} '
+            ts+=f'read() {t_read} f() {lps[1](watch())} '
 
             for df in dfs:
                 df()
 
-            ts+=f'df() {lps[2](watch())} '
+            ts+=f'df() {lps[2](watch())} drawtext() {lps[3](t_drawtext)} '
             ts+=f'downsample {downsampling_t}'
 
+            lines.insert(0, f'dnsmpl()+f()+df()+dt() {lps[4](t_total)}')
             lines.insert(0, ts)
             lines.insert(0, f'{frame.shape[0:2]} fps{int(fps):3d}')
+
+            watch3 = interval_gen(1000)
 
             for idx, s in enumerate(lines):
                 dwstext(frame, s,
@@ -188,10 +241,15 @@ def camloop(f=nop, threaded=False):
                     shadow=False,
                 )
 
+            t_drawtext = watch3()
+            t_total = watch_tot()
+
             rh.result = result
-            rh.frame = frame
-            rh.frameobj = frameobj
-            rh.fresh = True
+            # rh.frame = frame
+            # rh.frameobj = frameobj
+            # rh.fresh = True
+
+            rh.framebuffer.send(frameobj)
 
             if not threaded:
                 view_update()
@@ -332,16 +390,6 @@ square_lines_splitted = np.array([
     for l in square_lines
 ]).reshape((-1, 2, 2))
 
-def apply_transform(points, affine):
-    shape = list(points.shape)
-    lps = len(shape)-1
-    shape[-1]=1
-    padshape = tuple(shape)
-    pad = np.ones(padshape)
-    points = np.concatenate((points, pad), axis=lps, dtype='float32')
-
-    return np.matmul(points, affine)[...,0:2]
-
 def draw_transform_indicator(image, at):
     s = image.shape
 
@@ -389,10 +437,11 @@ def affine_estimator_gen():
 
     def affine_estimator(fo):
         nonlocal old_gray
-        frame = fo.frame
 
         # deal with camera calibration/ undistortion
         chessboard_finder(fo)
+
+        frame = fo.frame
 
         result = None
 
@@ -822,7 +871,7 @@ if __name__ == '__main__':
     while 1:
         cl.update()
         # print(cl.result)
-        time.sleep(0.1)
+        # time.sleep(0.1)
 
     # from tkfun2 import *
     # tk_imshow = tk_imshow_gen('camfeed')
