@@ -131,8 +131,8 @@ def camloop(f=nop, threaded=False):
             if w>640*2:
                 frame = cv2.resize(frame, (w//2,h//2),
                     # interpolation=cv2.INTER_NEAREST)
-                    interpolation=cv2.INTER_LINEAR)
-                    # interpolation=cv2.INTER_CUBIC)
+                    # interpolation=cv2.INTER_LINEAR)
+                    interpolation=cv2.INTER_CUBIC)
                 # frame = cv2.pyrDown(frame)
 
             lines = [] # text lines to draw
