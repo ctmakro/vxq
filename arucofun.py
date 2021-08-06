@@ -111,7 +111,6 @@ def camloop(f=nop, threaded=False):
         get_fps_interval = interval_gen()
 
         lps = [lpn_gen(3, 0.6, integerize=True) for i in range(6)]
-        lperr = lpn_gen(3, 0.5)
 
         fail_counter = 0
         framebuffer = MailWaiter()
@@ -127,19 +126,13 @@ def camloop(f=nop, threaded=False):
             nonlocal fail_counter, fps, t_read, framebuffer
 
             target_fps = 12 # limit framerate
-            target_interval = 1/target_fps
+            freq_reg = frequency_regulator_gen(12)
 
             while 1:
                 delta = get_fps_interval()
                 fps = 1/max(fpslp(delta),1e-3)
 
-
-                # if frame rate too high, slow down manually
-                err = lperr(target_interval - delta)
-                if err>0:
-                    # time.sleep(err*10)
-                    pass
-                # print(err)
+                freq_reg()
 
                 timer = interval_gen(1000)
                 ret, frame = cap.read()

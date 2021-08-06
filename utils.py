@@ -66,3 +66,40 @@ class MailWaiter:
 
 clip = lambda a,b: lambda x: min(b,max(a,x))
 clip255 = clip(0,255)
+
+def frequency_regulator_gen(freq, gain=10):
+    itvl = interval_gen()
+    lperr = lpn_gen(3, 0.5)
+    target_dt = 1/freq
+
+    lasterr = 0
+    ierr = 0
+
+    kp= .2
+    ki= 0.6
+    
+    def tick():
+        nonlocal ierr,lasterr
+
+        dt = itvl()
+        err = target_dt - dt
+        ierr += err
+
+        sleeptime = err*kp+ierr*ki
+
+        if sleeptime>0:
+            time.sleep(sleeptime)
+
+        lasterr = err
+
+    return tick
+
+if __name__ == '__main__':
+    fr = frequency_regulator_gen(10)
+    iv = interval_gen()
+    k = 0
+    while 1:
+        k+=1
+        j = iv()
+        print(f'{k:5d} {j:.5f} {abs(j-.1):.6f}')
+        fr()
