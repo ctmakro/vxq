@@ -1,3 +1,5 @@
+import smallfix
+
 import cv2
 cv = cv2
 import numpy as np
