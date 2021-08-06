@@ -129,6 +129,7 @@ def camloop(f=nop, threaded=False):
 
             h,w = frame.shape[0:2]
 
+            watch2 = interval_gen(1000)
             # smaller image for ease of processing
             if w>640*2:
                 frame = cv2.resize(frame, (w//2,h//2),
@@ -136,6 +137,7 @@ def camloop(f=nop, threaded=False):
                     # interpolation=cv2.INTER_LINEAR)
                     interpolation=cv2.INTER_CUBIC)
                 # frame = cv2.pyrDown(frame)
+            downsampling_t = watch2()
 
             lines = [] # text lines to draw
             dfs = [] # draw functions
@@ -152,6 +154,7 @@ def camloop(f=nop, threaded=False):
                 df()
 
             ts+=f'df() {lps[2](watch())} '
+            ts+=f'downsample {downsampling_t}'
 
             lines.insert(0, ts)
             lines.insert(0, f'{frame.shape[0:2]} fps{int(fps):3d}')
@@ -420,7 +423,7 @@ def affine_estimator_gen():
 
                 at = PerspectiveTransform()
                 # at = AffineTransform()
-                at.estimate_from(p0t, p1t)
+                at.estimate_from(p0t, p1t, maxIters=100)
 
                 if at.has_solution():
                     inliers = at.inliers
@@ -558,7 +561,7 @@ class AffineTransform():
 class PerspectiveTransform(AffineTransform):
     # estimate from a bunch of points
     def estimate_from(self, src, dest, **kv):
-        params = dict(method=cv.RANSAC and cv.RHO, ransacReprojThreshold=3)
+        params = dict(method=cv.RANSAC and cv.RHO, ransacReprojThreshold=2)
         params.update(kv)
 
         retval,inliers = cv.findHomography(

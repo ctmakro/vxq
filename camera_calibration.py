@@ -40,7 +40,6 @@ def draw_grid_distorted(fo, cm, dc, ncm):
     global lastcm, last_tl, last_l
 
     frame = fo.frame
-    itvl = interval_gen()
 
     from arucofun import dwsline
 
@@ -108,10 +107,8 @@ def draw_grid_distorted(fo, cm, dc, ncm):
     for p1, p2 in l:
         cv2.line(frame, p1, p2,
             thickness=1, color=c, shift=2,
-            lineType=cv2.LINE_AA,
+            # lineType=cv2.LINE_AA,
             )
-
-    fo.drawtext(f'grid drawn in {int(itvl()*1000)}')
 
 # https://github.com/Abhijit-2592/camera_calibration_API
 def asymmetric_world_points(rows, cols):
@@ -313,20 +310,26 @@ def chessboard_finder_gen(calibrate=True):
                         d['cm'] = cm
                         d['ncm'] = ncm
 
-
+        text = ''
         if cm is None or dc is None or ncm is None:
-            fo.drawtext(f'camera not calibrated {int(interval()*1000)}')
+            text+=f'camera not calibrated {int(interval()*1000)}'
 
         else:
-            fo.drawtext(f'camera calibrated in  {int(interval()*1000)}')
+            text+=f'camera calibrated in  {int(interval()*1000)}'
 
             ud = cv.undistort(frame, cm, dc, newCameraMatrix=ncm)
-            fo.drawtext(f'undistorted in  {int(interval()*1000)}')
+            text=f'undistorted in {int(interval()*1000)} '+text
 
             fo.frame[:] = ud[:] # force write
             # print(distCoeffs)
+        fo.drawtext(text)
 
-        fo.draw(lambda:draw_grid_distorted(fo, cm, dc, ncm))
+        def dgd():
+            itvl = interval_gen()
+            draw_grid_distorted(fo, cm, dc, ncm)
+            fo.drawtext(f'grid drawn in {int(itvl()*1000)}')
+
+        fo.draw(dgd)
 
         return None
 
