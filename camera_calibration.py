@@ -97,7 +97,7 @@ def grid_world_points():
 
     return k
 
-def chessboard_finder_gen():
+def chessboard_finder_gen(calibrate=True):
     last = None
     buf = [] # imagePoints buffer
     buf_wp = []
@@ -126,11 +126,14 @@ def chessboard_finder_gen():
         # blobDetector = cv.SimpleBlobDetector_create(bp)
 
         # should we look for board(expensive)?
-        if counter>=0:
-            counter = (counter+1) % 10
-            look_for_board = counter==0
+        if calibrate:
+            if counter>=0:
+                counter = (counter+1) % 10
+                look_for_board = counter==0
+            else:
+                look_for_board = True
         else:
-            look_for_board = True
+            look_for_board = False
 
         interval = interval_gen()
 
@@ -293,7 +296,8 @@ def chessboard_finder_gen():
 if __name__ == '__main__':
     from arucofun import *
 
-    cl = camloop(chessboard_finder_gen(), threaded=True)
+    # cl = camloop(chessboard_finder_gen(calibrate=False), threaded=True)
+    cl = camloop(chessboard_finder_gen(calibrate=True), threaded=True)
 
     while 1:
         cl.update()

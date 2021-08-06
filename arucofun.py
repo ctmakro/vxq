@@ -58,23 +58,30 @@ def camloop(f=nop, threaded=False):
         def try_open_camera(id):
             if sys.platform == 'win32':
                 cap = cv2.VideoCapture(id,
-                # cv2.CAP_DSHOW,
-                cv2.CAP_MSMF,
-                params=(3,1920,4,1080))
-            else:
-                cap = cv2.VideoCapture(id, cv2.CAP_ANY,
-                params=(3,1920,4,1080))
+                    # cv2.CAP_DSHOW,
+                    cv2.CAP_MSMF,
+                    params=(3,1920,4,1080),
+                )
 
+            else:
+                cap = cv2.VideoCapture(id,
+                    cv2.CAP_ANY,
+                    params=(3,1920,4,1080),
+                    # params=(3,1280,4,960),
+                    # params=(3,1600,4,1200),
+                )
+
+            print('trying to get h,w')
             height = cap.get(4)
             width = cap.get(3)
             print('height:', height, 'width:', width)
 
+                # if height==720:
+                #     print('frame height 720(apple webcam), not the one we want')
+                #     return False
+
             if not cap.isOpened():
                 print("Cannot open camera", id)
-                return False
-
-            if height==720:
-                print('frame height 720(apple webcam), not the one we want')
                 return False
 
             return cap
@@ -351,7 +358,7 @@ def affine_estimator_gen():
 
     # camera distortion
     from camera_calibration import chessboard_finder_gen
-    chessboard_finder = chessboard_finder_gen()
+    chessboard_finder = chessboard_finder_gen(calibrate=False)
 
     def affine_estimator(fo):
         nonlocal old_gray
