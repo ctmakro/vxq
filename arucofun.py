@@ -62,7 +62,16 @@ def camloop(f=nop, threaded=False):
                 cap = cv2.VideoCapture(id,
                     # cv2.CAP_DSHOW,
                     cv2.CAP_MSMF,
-                    params=(3,1920,4,1080),
+                    params=(
+                    3,1920,
+                    4,1080,
+                    # cv.CAP_PROP_EXPOSURE, -5,
+                    cv.CAP_PROP_CONTRAST, 0,
+                    # cv.CAP_PROP_SETTINGS, 0,
+                    cv.CAP_PROP_AUTO_EXPOSURE, 1,
+                    # cv.CAP_PROP_GAIN, 0,
+                    # cv.CAP_PROP_BRIGHTNESS, -50,
+                    ),
                 )
 
             else:
@@ -76,7 +85,8 @@ def camloop(f=nop, threaded=False):
             print('trying to get h,w')
             height = cap.get(4)
             width = cap.get(3)
-            print('height:', height, 'width:', width)
+            be = cap.get(cv.CAP_PROP_BACKEND)
+            print('height:', height, 'width:', width, 'backend:', be)
 
                 # if height==720:
                 #     print('frame height 720(apple webcam), not the one we want')
