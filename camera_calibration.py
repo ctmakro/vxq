@@ -94,11 +94,18 @@ def draw_grid_distorted(fo, cm, dc, ncm):
         l = last_tl
 
     c = (128,128,128)
-    for p1, p2 in l:
-        cv2.line(frame, p1, p2,
-            thickness=1, color=c, shift=2,
-            lineType=cv2.LINE_AA,
-            )
+    # for p1, p2 in l:
+    #     cv2.line(frame, p1, p2,
+    #         thickness=1, color=c, shift=2,
+    #         lineType=cv2.LINE_AA,
+    #         )
+
+    cv2.polylines(frame, l,
+        color = c,
+        thickness=1,
+        isClosed=False, shift=2,
+        lineType = cv2.LINE_AA,
+    )
 
 # https://github.com/Abhijit-2592/camera_calibration_API
 def asymmetric_world_points(rows, cols):
