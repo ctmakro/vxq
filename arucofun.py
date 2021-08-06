@@ -742,15 +742,16 @@ def tabletop_square_matcher_gen():
 
             if at.has_solution():
                 tst = at
+
                 if fail_counter == 40:
                     with get_shelf() as data:
                         data['tst'] = tst
                         print('tst saved')
 
-                fail_counter = 0
+            fail_counter = 0
 
-            else: # no solution now
-                fail_counter=min(40,fail_counter+1)
+        else: # no solution now
+            fail_counter=min(40,fail_counter+1)
 
 
         # draw the transform found by converting a cross into screen space
