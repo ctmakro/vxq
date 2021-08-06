@@ -69,15 +69,15 @@ clip255 = clip(0,255)
 
 def frequency_regulator_gen(freq, gain=10):
     itvl = interval_gen()
-    lperr = lpn_gen(3, 0.5)
+
     target_dt = 1/freq
 
     lasterr = 0
     ierr = 0
 
-    kp= .2
-    ki= 0.6
-    
+    kp= .0
+    ki= .8
+
     def tick():
         nonlocal ierr,lasterr
 
@@ -85,10 +85,14 @@ def frequency_regulator_gen(freq, gain=10):
         err = target_dt - dt
         ierr += err
 
+        ierr = max(-10,min(ierr,10))
+
         sleeptime = err*kp+ierr*ki
 
         if sleeptime>0:
             time.sleep(sleeptime)
+        else:
+            ierr = 0
 
         lasterr = err
 
@@ -98,8 +102,18 @@ if __name__ == '__main__':
     fr = frequency_regulator_gen(10)
     iv = interval_gen()
     k = 0
+
+    erra = 0
     while 1:
         k+=1
         j = iv()
         print(f'{k:5d} {j:.5f} {abs(j-.1):.6f}')
+
+        erra+=(j-.1)**2
         fr()
+
+        time.sleep(0.005)
+
+        if k>30:
+            print('erra',erra/30)
+            break
