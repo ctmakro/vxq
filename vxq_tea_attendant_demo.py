@@ -9,7 +9,7 @@ v = VXQHID(configuration=vxq_model)
 
 time.sleep(.5)
 
-cl = camloop(tabletop_square_matcher_gen(), threaded=True)
+cl_rh = camloop(tabletop_square_matcher_gen(), threaded=True)
 
 tst = None
 tags = {}
@@ -352,10 +352,15 @@ def mvc(root):
 implement = flask_ui_app('Javis GUI')
 run_threaded(lambda:implement(mvc))
 
+def wait_for_result():
+    global tags, tst
+    rb = cl_rh.resultbuffer
+    while 1:
+        result = rb.recv()
+        if result is not None:
+            tags, tst = result
 
-while 1:
-    cl.update()
-    time.sleep(.03) # 20hz max
-    res = cl.result
-    if res is not None:
-        tags, tst = res
+run_threaded(wait_for_result)
+
+while 1: # imshow loop
+    cl_rh.update()

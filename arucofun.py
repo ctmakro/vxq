@@ -11,35 +11,6 @@ from utils import *
 
 marker_type = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_50)
 
-class MailWaiter:
-    def __init__(self):
-        self.cond = threading.Condition()
-        self.mail = None
-
-    def send(self, mail):
-        with self.cond:
-            self.mail = mail
-            self.cond.notify()
-
-    def recv(self):
-        while 1:
-            # with flock:
-            tt = 0.0
-            dt = 0.5
-
-            with self.cond:
-                if self.cond.wait(dt):
-                    mail = self.mail
-                    self.mail = None
-                    return mail
-                else:
-                    tt+=dt
-                    print(f'MailWaiter waited for {tt:.1f}s')
-                    dt*=2
-
-    def gotmail(self):
-        return self.mail is not None
-
 nop = lambda x:x
 def camloop(f=nop, threaded=False):
 
@@ -50,6 +21,7 @@ def camloop(f=nop, threaded=False):
     rh.result = None
     # rh.frame = None
     rh.framebuffer = MailWaiter()
+    rh.resultbuffer = MailWaiter()
 
     def view_update(): # please call from main thread
         fresh = False
@@ -59,7 +31,7 @@ def camloop(f=nop, threaded=False):
             cv2.imshow(window_name, frameobj.frame)
             fresh = True
 
-        k = cv2.waitKey(5) & 0xff
+        k = cv2.waitKey(16) & 0xff
         if k in [27,ord('q'),ord('f')]:
             exit()
 
@@ -83,8 +55,8 @@ def camloop(f=nop, threaded=False):
                     # cv2.CAP_DSHOW,
                     cv2.CAP_MSMF,
                     params=(
-                    3,1920,
-                    4,1080,
+                    # 3,1920,4,1080,
+                    3,1280,4,720,
                     # cv.CAP_PROP_EXPOSURE, -5,
                     cv.CAP_PROP_CONTRAST, 0,
                     # cv.CAP_PROP_SETTINGS, 0,
@@ -190,8 +162,10 @@ def camloop(f=nop, threaded=False):
             h,w = frame.shape[0:2]
 
             # smaller image for ease of processing
-            if w>640*2:
-                frame = cv2.resize(frame, (w//2,h//2),
+            if w>960*1.2:
+                nw = 960
+                nh = int(nw/w * h )
+                frame = cv2.resize(frame, (nw,nh),
                     # interpolation=cv2.INTER_NEAREST)
                     # interpolation=cv2.INTER_LINEAR)
                     interpolation=cv2.INTER_CUBIC)
@@ -209,6 +183,7 @@ def camloop(f=nop, threaded=False):
 
             watch = interval_gen(1000)
             result = f(frameobj)
+            rh.resultbuffer.send(result)
             ts+=f'read() {t_read} f() {lps[1](watch())} '
 
             for df in dfs:
