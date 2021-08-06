@@ -324,11 +324,12 @@ def chessboard_finder_gen(calibrate=True):
         def dgd():
             itvl = interval_gen()
             draw_grid_distorted(fo, cm, dc, ncm)
-            fo.drawtext(f'grid drawn in {int(itvl()*1000)}')
+            fo.drawtext(f'grid drawn in {int(lp_t_grid(itvl()*1000))}')
 
         fo.draw(dgd)
 
         return None
+    lp_t_grid = lpn_gen(3, 0.75)
 
     return chessboard_finder
 
