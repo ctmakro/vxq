@@ -57,6 +57,8 @@ def camloop(f=nop, threaded=False):
                     params=(
                     # 3,1920,4,1080,
                     3,1280,4,720,
+                    cv.CAP_PROP_FPS, 12,
+
                     # cv.CAP_PROP_EXPOSURE, -5,
                     cv.CAP_PROP_CONTRAST, 0,
                     # cv.CAP_PROP_SETTINGS, 0,
@@ -69,7 +71,10 @@ def camloop(f=nop, threaded=False):
             else:
                 cap = cv2.VideoCapture(id,
                     cv2.CAP_ANY,
-                    params=(3,1920,4,1080),
+                    params=(
+                        3,1920,4,1080,
+                        # cv.CAP_PROP_FPS, 20,
+                    ),
                     # params=(3,1280,4,960),
                     # params=(3,1600,4,1200),
                 )
@@ -106,6 +111,7 @@ def camloop(f=nop, threaded=False):
         get_fps_interval = interval_gen()
 
         lps = [lpn_gen(3, 0.6, integerize=True) for i in range(6)]
+        lperr = lpn_gen(3, 0.5)
 
         fail_counter = 0
         framebuffer = MailWaiter()
@@ -118,11 +124,22 @@ def camloop(f=nop, threaded=False):
 
         # read frames from camera nonstop
         def loop_reader():
-            nonlocal fail_counter, fps, t_read,framebuffer
+            nonlocal fail_counter, fps, t_read, framebuffer
+
+            target_fps = 12 # limit framerate
+            target_interval = 1/target_fps
 
             while 1:
                 delta = get_fps_interval()
                 fps = 1/max(fpslp(delta),1e-3)
+
+
+                # if frame rate too high, slow down manually
+                err = lperr(target_interval - delta)
+                if err>0:
+                    # time.sleep(err*10)
+                    pass
+                # print(err)
 
                 timer = interval_gen(1000)
                 ret, frame = cap.read()

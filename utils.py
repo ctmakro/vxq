@@ -60,6 +60,9 @@ class MailWaiter:
                     tt+=dt
                     print(f'MailWaiter waited for {tt:.1f}s')
                     dt*=2
-                    
+
     def gotmail(self):
         return self.mail is not None
+
+clip = lambda a,b: lambda x: min(b,max(a,x))
+clip255 = clip(0,255)

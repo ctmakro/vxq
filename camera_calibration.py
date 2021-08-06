@@ -14,9 +14,6 @@ from functools import lru_cache
 data = get_shelf()
 print('data:', list(data.keys()))
 
-clip = lambda a,b: lambda x: min(b,max(a,x))
-clip255 = clip(0,255)
-
 def draw_chessboard_corners(frameobj, corners):
     from arucofun import dwscircle
 
@@ -138,6 +135,8 @@ def chessboard_finder_gen(calibrate=True):
 
     counter = 0
 
+    m1m2 = None
+
     with get_shelf() as d:
         d['has_lens_profile'] = True
 
@@ -146,7 +145,7 @@ def chessboard_finder_gen(calibrate=True):
         if 'ncm' in d: ncm = d['ncm']
 
     def chessboard_finder(frameobj):
-        nonlocal last, buf, calibs, cm,ncm,dc,buf_wp,counter
+        nonlocal last, buf, calibs, cm,ncm,dc,buf_wp,counter,m1m2
 
         fo = frameobj
         frame = fo.frame
@@ -314,6 +313,8 @@ def chessboard_finder_gen(calibrate=True):
                         d['cm'] = cm
                         d['ncm'] = ncm
 
+                    m1m2 = None
+
         text = ''
         if cm is None or dc is None or ncm is None:
             text+=f'camera not calibrated {int(interval()*1000)}'
@@ -321,7 +322,22 @@ def chessboard_finder_gen(calibrate=True):
         else:
             text+=f'camera calibrated in  {int(interval()*1000)}'
 
-            ud = cv.undistort(frame, cm, dc, newCameraMatrix=ncm)
+            if m1m2 is None:
+                m1,m2 = cv.initUndistortRectifyMap(
+                    cameraMatrix=cm,
+                    distCoeffs=dc,
+                    R=None,
+                    newCameraMatrix=ncm,
+                    size = frame.shape[0:2][::-1],
+                    m1type = cv.CV_16SC2,
+                )
+                m1m2 = m1,m2
+            else:
+                m1,m2 = m1m2
+
+            ud = cv.remap(frame, m1, m2,
+                interpolation = cv.INTER_LINEAR)
+            # ud = cv.undistort(frame, cm, dc, newCameraMatrix=ncm)
             text=f'undistorted in {int(interval()*1000)} '+text
 
             fo.frame[:] = ud[:] # force write
@@ -336,6 +352,7 @@ def chessboard_finder_gen(calibrate=True):
         fo.draw(dgd)
 
         return None
+
     lp_t_grid = lpn_gen(3, 0.75)
 
     return chessboard_finder
@@ -344,8 +361,7 @@ if __name__ == '__main__':
     from arucofun import *
 
     # cl = camloop(chessboard_finder_gen(calibrate=False), threaded=True)
-    cl = camloop(chessboard_finder_gen(calibrate=True), threaded=True)
+    cl_rh = camloop(chessboard_finder_gen(calibrate=True), threaded=True)
 
     while 1:
-        cl.update()
-        time.sleep(0.1)
+        cl_rh.update()
