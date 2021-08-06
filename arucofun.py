@@ -675,7 +675,8 @@ unit_square_coords = [[1,1], [1,0], [0,0], [0,1]]
 
 def aruco_tracker_gen():
     ind = {}
-    ae = affine_estimator_gen()
+    # ae = affine_estimator_gen()
+    ae = None
 
     flip = 0
 
@@ -687,7 +688,8 @@ def aruco_tracker_gen():
 
         interval = interval_gen()
 
-        transform = ae(fo)
+        # transform = ae(fo)
+        transform = None
 
         interval()
         if flip==0:
@@ -697,22 +699,21 @@ def aruco_tracker_gen():
             dd = {}
             fo.drawtext(f'mrkr not in {int(interval()*1000)}')
 
-        if transform is not None:
-            to_interp = {}
-            for k,v in list(ind.items()): # for each detection in cache
-                if k not in dd: # if not detected in this frame
+        # if transform is not None:
+        # to_interp = {}
+        for k,v in list(ind.items()): # for each detection in cache
+            if k not in dd: # if not detected in this frame
+                if transform is not None:
                     v.corners = transform.transform(v.corners)
                     v.update()
 
-                    v.iage+=1
-                    if (v.iage>16)\
-                        or (v.cxy[0]<0) or (v.cxy[0]>frame.shape[1])\
-                        or (v.cxy[1]<0) or (v.cxy[1]>frame.shape[0]):
-                        del ind[k]
+                v.iage+=1
+                if (v.iage>16)\
+                    or (v.cxy[0]<0) or (v.cxy[0]>frame.shape[1])\
+                    or (v.cxy[1]<0) or (v.cxy[1]>frame.shape[0]):
+                    del ind[k]
 
-            ind.update(dd)
-        else:
-            ind = dd.copy()
+        ind.update(dd)
         tags = ind
 
         fo.draw(lambda:mark_detections(frame, tags.values()))
