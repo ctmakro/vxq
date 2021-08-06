@@ -33,3 +33,33 @@ def run_threaded(f):
     t = threading.Thread(target=f, daemon=True)
     t.start()
     return t
+
+class MailWaiter:
+    def __init__(self):
+        self.cond = threading.Condition()
+        self.mail = None
+
+    def send(self, mail):
+        with self.cond:
+            self.mail = mail
+            self.cond.notify()
+
+    def recv(self, keep=False):
+        while 1:
+            # with flock:
+            tt = 0.0
+            dt = 0.5
+
+            with self.cond:
+                if self.cond.wait(dt):
+                    mail = self.mail
+                    if not keep:
+                        self.mail = None
+                    return mail
+                else:
+                    tt+=dt
+                    print(f'MailWaiter waited for {tt:.1f}s')
+                    dt*=2
+                    
+    def gotmail(self):
+        return self.mail is not None
