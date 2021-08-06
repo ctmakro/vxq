@@ -33,50 +33,77 @@ def draw_chessboard_corners(frameobj, corners):
             color=c,
             shadow=True, thickness=2))
 
+lastcm = None
+last_l = None
+last_tl = None
 def draw_grid_distorted(frame, cm, dc, ncm):
+    global lastcm, last_tl, last_l
+
     from arucofun import dwsline
 
-    h, w = frame.shape[0:2]
-    ch, cw = h//2, w//2
+    if last_l is None:
+        h, w = frame.shape[0:2]
+        ch, cw = h//2, w//2
 
-    k = 80
+        k = 80
 
-    sh = ch - ((h-ch) // k +1) * k
-    sw = cw - ((w-cw) // k +1) * k
+        sh = ch - ((h-ch) // k +1) * k
+        sw = cw - ((w-cw) // k +1) * k
 
-    l = []
-    for i in range(sw, w, k):
-        for j in range(sh, h, k):
-            x = i
-            y = j
+        eh = ch + ((h-ch) // k +1) * k
+        ew = cw + ((w-cw) // k +1) * k
 
-            l.append([[x,y], [x+k,y]])
-            l.append([[x,y], [x,y+k]])
+        l = []
+        for i in range(sw, ew+1, k):
+            for j in range(sh, eh+1, k):
+                x = i
+                y = j
+
+                l.append([[x-k*.5,y], [x,y]])
+                l.append([[x,y], [x+k*.5,y]])
+                l.append([[x,y], [x,y+k*.5]])
+                l.append([[x,y-k*.5], [x,y]])
+
+        last_l = l
+    else:
+        l = last_l
 
             #(n, 2, 2)
 
     if cm is not None:
-        l = np.array(l, dtype='float64')
-        l.shape = l.shape[0] * 2, l.shape[2]
+        if (lastcm is not None) and ((cm-lastcm).mean()==0) and (last_tl is not None):
+            l = last_tl
+        else:
 
-        nl = l.copy()
-        # # nl3d = cv.convertPointsToHomogeneous(nl)
-        # map1, map2 = cv.initUndistortRectifyMap(cm, dc, None, cm,
-        #     (w,h), cv.CV_32FC1)
-        #
-        # nl[:,0] = map1.at(nl[:,0])
-        # nl[:,1] = map2.at(nl[:,1])
-        #
-        # # nldist,jacobian = cv.projectPoints(nl3d, (0,0,0),(0,0,0), cm, dc)
-        # # nl = nldist
-        nl = cv.undistortPoints(nl, cm, dc, P=ncm)
+            l = np.array(l, dtype='float64')
+            l.shape = l.shape[0] * 2, l.shape[2]
 
-        nl.shape = nl.shape[0]//2, 2, 2
-        l = nl.round().astype('int32')
+            nl = l.copy()
+            # # nl3d = cv.convertPointsToHomogeneous(nl)
+            # map1, map2 = cv.initUndistortRectifyMap(cm, dc, None, cm,
+            #     (w,h), cv.CV_32FC1)
+            #
+            # nl[:,0] = map1.at(nl[:,0])
+            # nl[:,1] = map2.at(nl[:,1])
+            #
+            # # nldist,jacobian = cv.projectPoints(nl3d, (0,0,0),(0,0,0), cm, dc)
+            # # nl = nldist
+            nl = cv.undistortPoints(nl, cm, dc, P=ncm)
+
+            nl.shape = nl.shape[0]//2, 2, 2
+            l = (nl*4).round().astype('int32')
+
+            last_tl = l
+            lastcm = cm
+
+    else:
+        l = (l*4).round().astype('int32')
 
     for p1, p2 in l:
         dwsline(frame, (p1[0], p1[1]), (p2[0], p2[1]),
-            thickness=1,color=(128,128,128), shadow=False)
+            thickness=1,color=(128,128,128), shadow=False, shift=2,
+            lineType=cv2.LINE_AA,
+            )
 
 # https://github.com/Abhijit-2592/camera_calibration_API
 def asymmetric_world_points(rows, cols):
