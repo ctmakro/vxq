@@ -156,9 +156,20 @@ def camloop(f=nop, threaded=False):
 
             for idx, s in enumerate(lines):
                 dwstext(frame, s,
-                    (2,20*(idx+1)), cv2.FONT_HERSHEY_DUPLEX,
-                    0.6,
+                    (2,12*(idx+1)), cv2.FONT_HERSHEY_DUPLEX,
+                    0.35,
+                    color=(0,0,0),
+                    thickness=3,
+                    shadow=False,
+                )
+            for idx, s in enumerate(lines):
+                dwstext(frame, s,
+                    (2,12*(idx+1)), cv2.FONT_HERSHEY_DUPLEX,
+                    0.35,
                     color=(255,255,255),
+                    thickness=1,
+                    lineType=cv2.LINE_AA,
+                    shadow=False,
                 )
 
             rh.result = result
