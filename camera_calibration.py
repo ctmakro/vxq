@@ -289,7 +289,7 @@ def chessboard_finder_gen(calibrate=True):
                         ncm = retval
                     else:
                         ncm = cm.copy()
-                        ncm[0:2,0:2] *= 0.8 # smaller crop to deal with fisheye
+                        ncm[0:2,0:2] *= 0.9 # smaller crop to deal with fisheye
 
                     print('dist coeffs')
 
