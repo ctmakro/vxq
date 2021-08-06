@@ -207,23 +207,30 @@ def chessboard_finder_gen(calibrate=True):
                 centers = np.array(centers, dtype='float32')
 
 
+                # avgdist
+                if len(buf)!=0:
+                    avgdist = np.average(np.abs(buf[-1] - centers))
+                    if avgdist > 10:
+                        # far enough from last
+                        avgdist_good = True
+                    else:
+                        avgdist_good = False
+                else:
+                    avgdist_good = True
+
                 # estimate shakiness of image
                 if last is None:
                     last = centers
                 else:
-                    shakeness = np.average(np.abs(centers - last))
-                    if shakeness < .5:
-                        # stable
+                    if avgdist_good:
 
-                        if len(buf)!=0:
-                            avgdist = np.average(np.abs(buf[-1] - centers))
-                            if avgdist > 10:
-                                # far enough from last
-                                should_calib = True
-                        else:
+                        shakeness = np.average(np.abs(centers - last))
+                        if shakeness < .5:
                             should_calib = True
+                        else:
+                            print('too shaky!', shakeness)
                     else:
-                        print('shakiness', shakeness)
+                        print(f'(got {len(buf)}) move to next orientation.')
 
                     last = centers
 
