@@ -82,12 +82,6 @@ def camloop(f=nop, threaded=False):
                     # params=(3,1600,4,1200),
                 )
 
-            print('trying to get h,w')
-            height = cap.get(4)
-            width = cap.get(3)
-            be = cap.get(cv.CAP_PROP_BACKEND)
-            print('height:', height, 'width:', width, 'backend:', be)
-
                 # if height==720:
                 #     print('frame height 720(apple webcam), not the one we want')
                 #     return False
@@ -96,6 +90,13 @@ def camloop(f=nop, threaded=False):
                 print("Cannot open camera", id)
                 return False
 
+            print('trying to get h,w')
+            height = cap.get(4)
+            width = cap.get(3)
+            be = cap.getBackendName()
+
+            print('height:', height, 'width:', width, 'backend:', be)
+            
             return cap
             # raise Exception('frame height not 480')
 
