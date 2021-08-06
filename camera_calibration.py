@@ -36,8 +36,11 @@ def draw_chessboard_corners(frameobj, corners):
 lastcm = None
 last_l = None
 last_tl = None
-def draw_grid_distorted(frame, cm, dc, ncm):
+def draw_grid_distorted(fo, cm, dc, ncm):
     global lastcm, last_tl, last_l
+
+    frame = fo.frame
+    itvl = interval_gen()
 
     from arucofun import dwsline
 
@@ -97,13 +100,18 @@ def draw_grid_distorted(frame, cm, dc, ncm):
             lastcm = cm
 
     else:
-        l = (l*4).round().astype('int32')
+        if last_tl is None:
+            last_tl = (l*4).round().astype('int32')
+        l = last_tl
 
+    c = (128,128,128)
     for p1, p2 in l:
-        dwsline(frame, (p1[0], p1[1]), (p2[0], p2[1]),
-            thickness=1,color=(128,128,128), shadow=False, shift=2,
+        cv2.line(frame, p1, p2,
+            thickness=1, color=c, shift=2,
             lineType=cv2.LINE_AA,
             )
+
+    fo.drawtext(f'grid drawn in {int(itvl()*1000)}')
 
 # https://github.com/Abhijit-2592/camera_calibration_API
 def asymmetric_world_points(rows, cols):
@@ -313,10 +321,12 @@ def chessboard_finder_gen(calibrate=True):
             fo.drawtext(f'camera calibrated in  {int(interval()*1000)}')
 
             ud = cv.undistort(frame, cm, dc, newCameraMatrix=ncm)
+            fo.drawtext(f'undistorted in  {int(interval()*1000)}')
+
             fo.frame[:] = ud[:] # force write
             # print(distCoeffs)
 
-        fo.draw(lambda:draw_grid_distorted(frame, cm, dc, ncm))
+        fo.draw(lambda:draw_grid_distorted(fo, cm, dc, ncm))
 
         return None
 
