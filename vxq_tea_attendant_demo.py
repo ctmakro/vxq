@@ -256,10 +256,13 @@ def mvc(root):
     global update_buttons, button_texts, fprint
 
     mode = 0
-    mode_sw = [Button(), Button()]
+    mode_sw = [Button(), Button(), Button()]
 
     mode_sw[0].text = '主人控制'
     mode_sw[1].text = '自动加茶'
+    mode_sw[2].text = '暂无功能'
+
+    mode_sw[2].classes = ['button', 'disabled']
 
     def switch_to_mode(x):
         def switch(self):
@@ -355,4 +358,4 @@ while 1:
     time.sleep(.03) # 20hz max
     res = cl.result
     if res is not None:
-        tags, tst = cl.result
+        tags, tst = res

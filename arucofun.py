@@ -650,10 +650,17 @@ def aruco_tracker_gen():
 
 def tabletop_square_matcher_gen():
     tabletop_square_transform = tst = PerspectiveTransform()
+    fail_counter = 0
+
+    from shelftest import get_shelf
+    with get_shelf() as data:
+        if 'tst' in data:
+            tst = data['tst']
+
     aruco_tracker = aruco_tracker_gen()
 
     def tabletop_square_matcher(fo):
-        nonlocal tst, aruco_tracker
+        nonlocal tst, aruco_tracker, fail_counter
         frame = fo.frame
 
         tags = aruco_tracker(fo)
@@ -735,6 +742,16 @@ def tabletop_square_matcher_gen():
 
             if at.has_solution():
                 tst = at
+                if fail_counter == 40:
+                    with get_shelf() as data:
+                        data['tst'] = tst
+                        print('tst saved')
+
+                fail_counter = 0
+
+            else: # no solution now
+                fail_counter=min(40,fail_counter+1)
+
 
         # draw the transform found by converting a cross into screen space
         if tst.has_solution():
