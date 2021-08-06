@@ -370,10 +370,14 @@ def draw_trackpoints(image, p0, color=(0,0,255), radius=3, thickness=1):
             shift=0, shadow=False, thickness=thickness)
 
 def draw_tracks(image, p0, p1):
-    for k0, k1 in zip(p0, p1):
-        dwsline(image, (int(k0[0]), int(k0[1])),
-            (int(k1[0]), int(k1[1])),
-            color=(200,200,0), shift=0, shadow=False, thickness=1)
+    l = (np.stack([p0,p1], axis=1)*4).astype('int32')
+
+    cv2.polylines(image, l,
+        color = (200,200,0),
+        thickness=1,
+        isClosed=False, shift=2,
+        lineType = cv2.LINE_AA,
+    )
 
 # draw a square
 square_lines = np.array([
@@ -435,8 +439,10 @@ def affine_estimator_gen():
     from camera_calibration import chessboard_finder_gen
     chessboard_finder = chessboard_finder_gen(calibrate=False)
 
+    points_buffer = pb = []
+
     def affine_estimator(fo):
-        nonlocal old_gray
+        nonlocal old_gray, pb
 
         # deal with camera calibration/ undistortion
         chessboard_finder(fo)
@@ -473,8 +479,14 @@ def affine_estimator_gen():
             p0_tracked = p0t = p0[st==1] * 4. # due to previous downscale
             p1_tracked = p1t = p1[st==1] * 4.
 
-            fo.draw(lambda:draw_tracks(frame, p0t, p1t))
-            # ts+=f'draw trks {int(interval()*1000)} '
+            pb.append((p0t, p1t))
+            if len(pb)>5:
+                pb.pop(0)
+
+            for p0t,p1t in pb:
+                fo.draw(lambda p0=p0t, p1=p1t:draw_tracks(frame, p0, p1))
+
+            ts+=f'draw trks {int(interval()*1000)} '
 
             ss += f'{len(p0_tracked)} tracked '
 
@@ -730,6 +742,8 @@ def tabletop_square_matcher_gen():
         # 取其他值时仅作测试用。
         tagidx = [0, 1, 2, 3]
         # tagidx = [22,24,42,40]
+
+        l2d = []
         for p0i, p1i in [(0,1),(1,2),(2,3),(3,0),(0,2),(1,3)]:
             try:
                 p0 = tags[tagidx[p0i]]
@@ -737,12 +751,19 @@ def tabletop_square_matcher_gen():
             except:
                 continue
             else:
-                fo.draw(lambda p0=p0.cxy,p1=p1.cxy:
-                    dwsline(frame,
-                        (int(p0[0]*8), int(p0[1]*8)),
-                        (int(p1[0]*8), int(p1[1]*8)),
-                        color=(255,255,200), shift=3, thickness=1)
-                )
+                l2d.append([p0.cxy, p1.cxy])
+        if l2d:
+            l2d = (np.array(l2d, dtype='float32')*4).astype('int32')
+            fo.draw(lambda: cv2.polylines(
+                frame, l2d, isClosed=False,
+                color = (0,0,0), thickness=2, shift=2,
+                lineType = cv2.LINE_AA,
+            ))
+            fo.draw(lambda: cv2.polylines(
+                frame, l2d, isClosed=False,
+                color = (255,255,200), thickness=1, shift=2,
+                lineType = cv2.LINE_AA,
+            ))
 
         if 0:
             # attempt to solve for cross point given 4 points
@@ -818,34 +839,41 @@ def tabletop_square_matcher_gen():
         if tst.has_solution():
             fo.drawtext(f'tst got solution')
 
-            ns = nsplits = 5
-            for i in range(ns):
-                for j in range(ns):
-                    new_p = tst.transform(np.array([i,j])/(ns-1), inverse=True)
+            # ns = nsplits = 5
+            # for i in range(ns):
+            #     for j in range(ns):
+            #         new_p = tst.transform(np.array([i,j])/(ns-1), inverse=True)
+            #
+            #         fo.draw(lambda p1=new_p:
+            #             dwscircle(frame,
+            #                 (int(p1[0]), int(p1[1])),
+            #                 5,
+            #                 color=(255,50,128),
+            #                 shift=0, shadow=False, thickness=2)
+            #         )
 
-                    fo.draw(lambda p1=new_p:
-                        dwscircle(frame,
-                            (int(p1[0]), int(p1[1])),
-                            5,
-                            color=(255,50,128),
-                            shift=0, shadow=False, thickness=2)
-                    )
+            cl = []
+            for i in range(5):
+                k = i/4
+                cl.append([[k, 0], [k, 1]])
+                cl.append([[1, k], [0, k]])
 
-            cross_lines = np.array([[[.5,0.], [.5,1.]], [[0.,.5], [1.,.5]]])
-            cross_lines = tst.transform(cross_lines, inverse=True)
-            for p0k, p1k in cross_lines:
-                fo.draw(lambda p0=p0k,p1=p1k:
-                    dwsline(frame,
-                        (int(p0[0]), int(p0[1])),
-                        (int(p1[0]), int(p1[1])),
-                        color=(255,200,220), shift=0, thickness=1) or
+            cross_lines = np.array(cl)
+            # cross_lines = np.array([[[.5,0.], [.5,1.]], [[0.,.5], [1.,.5]]])
+            cross_lines = tst.transform(cross_lines, inverse=True)*4
+            cross_lines = cross_lines.astype('int32')
 
-                    dwscircle(frame,
-                        (int(p0[0]), int(p0[1])),
-                        12,
-                        color=(255,50,128),
-                        shift=0, shadow=False, thickness=2)
-                )
+            fo.draw(lambda: cv2.polylines(
+                frame, cross_lines, isClosed=False,
+                color = (0,0,0), thickness=2, shift=2,
+                lineType = cv2.LINE_AA,
+            ))
+            fo.draw(lambda: cv2.polylines(
+                frame, cross_lines, isClosed=False,
+                color = (255,200,200), thickness=1, shift=2,
+                lineType = cv2.LINE_AA,
+            ))
+
 
             # compensate perspective error
             for k in [] and tags:
