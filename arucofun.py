@@ -51,41 +51,37 @@ def camloop(f=nop, threaded=False):
     def actual_loop():
         def try_open_camera(id):
             if sys.platform == 'win32':
-                cap = cv2.VideoCapture(id,
-                    # cv2.CAP_DSHOW,
-                    cv2.CAP_MSMF,
-                    params=(
-                    # 3,1920,4,1080,
-                    3,1280,4,720,
-                    cv.CAP_PROP_FPS, 12,
-
-                    # cv.CAP_PROP_EXPOSURE, -5,
-                    cv.CAP_PROP_CONTRAST, 0,
-                    # cv.CAP_PROP_SETTINGS, 0,
-                    cv.CAP_PROP_AUTO_EXPOSURE, 1,
-                    # cv.CAP_PROP_GAIN, 0,
-                    # cv.CAP_PROP_BRIGHTNESS, -50,
-                    ),
-                )
-
+                cap = cv2.VideoCapture(id, cv2.CAP_MSMF)
             else:
-                cap = cv2.VideoCapture(id,
-                    cv2.CAP_ANY,
-                    params=(
-                        3,1920,4,1080,
-                        # cv.CAP_PROP_FPS, 20,
-                    ),
-                    # params=(3,1280,4,960),
-                    # params=(3,1600,4,1200),
-                )
-
-                # if height==720:
-                #     print('frame height 720(apple webcam), not the one we want')
-                #     return False
+                cap = cv2.VideoCapture(id, cv2.CAP_ANY)
 
             if not cap.isOpened():
                 print("Cannot open camera", id)
                 return False
+
+            target_camera = 'ov2659' or 'anc' or 'pro'
+
+            print('target_camera', target_camera)
+            if target_camera=='ov2659':
+                # cap.set(3,1280); cap.set(4,1024)
+                cap.set(3,1600); cap.set(4,1200)
+                cap.set(cv.CAP_PROP_FPS, 30)
+                # cap.set(cv.CAP_PROP_CONTRAST, -4)
+                cap.set(cv.CAP_PROP_EXPOSURE, -10,)
+                cap.set(cv.CAP_PROP_AUTO_EXPOSURE, 20)
+
+            elif target_camera == 'anc':
+                pass
+
+            elif target_camera == 'pro':
+                cap.set(3,1280)
+                cap.set(4,720)
+
+                cap.set(cv.CAP_PROP_FPS, 12)
+
+                # cv.CAP_PROP_EXPOSURE, -5,
+                cap.set(cv.CAP_PROP_CONTRAST, 0)
+                cap.set(cv.CAP_PROP_AUTO_EXPOSURE, 1)
 
             print('trying to get h,w')
             height = cap.get(4)
@@ -173,9 +169,13 @@ def camloop(f=nop, threaded=False):
 
             # smaller image for ease of processing
             optimal_width = ow = 960
-            if w>ow*1.2:
-                nw = ow
-                nh = int(ow/w * h )
+            optimal_height = oh = 540
+
+            scale = min(ow/w, oh/h)
+            if scale < .9:
+                nw = int(w*scale)
+                nh = int(h*scale)
+
                 frame = cv2.resize(frame, (nw,nh),
                     # interpolation=cv2.INTER_NEAREST)
                     # interpolation=cv2.INTER_LINEAR)
@@ -272,9 +272,15 @@ dwstext = draw_with_shadow(cv2.putText)
 
 arucoParams = ac = cv2.aruco.DetectorParameters_create()
 ac.cornerRefinementMethod = cv.aruco.CORNER_REFINE_SUBPIX
-ac.minMarkerPerimeterRate = 0.03
-ac.polygonalApproxAccuracyRate = 0.04
-ac.maxErroneousBitsInBorderRate = 0.6
+ac.cornerRefinementMethod = cv.aruco.CORNER_REFINE_APRILTAG
+ac.cornerRefinementMethod = cv.aruco.CORNER_REFINE_CONTOUR
+
+ac.minMarkerPerimeterRate = 0.02
+ac.maxMarkerPerimeterRate = 0.3
+
+ac.polygonalApproxAccuracyRate = 0.08
+# ac.polygonalApproxAccuracyRate = 0.04
+# ac.maxErroneousBitsInBorderRate = 0.6
 # ac.errorCorrectionRate = 0.9
 # ac.aprilTagMaxLineFitMse = 5.0
 
@@ -288,7 +294,7 @@ class Detection:
 
     def update(self):
         if not hasattr(self, 'last_corners'):
-            self.corners_lp = lpn_gen(3, 0.8)
+            self.corners_lp = lpn_gen(3, 0.5)
         corners = self.corners_lp(self.corners)
         corners = self.corners
 
@@ -664,13 +670,12 @@ unit_square_coords = [[1,1], [1,0], [0,0], [0,1]]
 def aruco_tracker_gen():
     ind = {}
     ae = affine_estimator_gen(skip=True)
-
-    flip = 0
+    err = 0
+    frametimer = interval_gen()
 
     def aruco_tracker(fo):
-        nonlocal ind, ae, flip
+        nonlocal ind, ae, err
 
-        flip = (flip+1)%3
         frame = fo.frame
 
         interval = interval_gen()
@@ -678,7 +683,10 @@ def aruco_tracker_gen():
         transform = ae(fo)
 
         interval()
-        if flip==0:
+
+        err+=frametimer()
+        if err>=0.25:
+            err-=0.25
             dd, dl = detect(frame)
             fo.drawtext(f'mrkr det in {int(interval()*1000)}')
         else:
