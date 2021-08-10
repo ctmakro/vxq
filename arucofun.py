@@ -68,7 +68,7 @@ def camloop(f=nop, threaded=False):
                 cap.set(cv.CAP_PROP_FPS, 30)
                 # cap.set(cv.CAP_PROP_CONTRAST, 0)
                 cap.set(cv.CAP_PROP_EXPOSURE, -10,)
-                cap.set(cv.CAP_PROP_AUTO_EXPOSURE, 20)
+                # cap.set(cv.CAP_PROP_AUTO_EXPOSURE, 20)
 
             elif target_camera == 'anc':
                 pass
@@ -80,8 +80,8 @@ def camloop(f=nop, threaded=False):
                 cap.set(cv.CAP_PROP_FPS, 12)
 
                 # cv.CAP_PROP_EXPOSURE, -5,
-                cap.set(cv.CAP_PROP_CONTRAST, 0)
-                cap.set(cv.CAP_PROP_AUTO_EXPOSURE, 1)
+                # cap.set(cv.CAP_PROP_CONTRAST, 0)
+                # cap.set(cv.CAP_PROP_AUTO_EXPOSURE, 1)
 
             print('trying to get h,w')
             height = cap.get(4)
@@ -275,7 +275,7 @@ dwstext = draw_with_shadow(cv2.putText)
 
 arucoParams = ac = cv2.aruco.DetectorParameters_create()
 ac.cornerRefinementMethod = cv.aruco.CORNER_REFINE_SUBPIX
-ac.cornerRefinementMethod = cv.aruco.CORNER_REFINE_APRILTAG
+# ac.cornerRefinementMethod = cv.aruco.CORNER_REFINE_APRILTAG
 ac.cornerRefinementMethod = cv.aruco.CORNER_REFINE_CONTOUR
 
 ac.minMarkerPerimeterRate = 0.02
@@ -311,7 +311,7 @@ class Detection:
         self.cxy = np.sum(corners, 0) * .25
         self.uxy = np.sum(corners[0:2] - corners[2:4], 0) * .5
         self.rxy = np.sum(corners[1:2:4] - corners[0:2:3], 0) * 1
-        self.rexy = self.cxy + self.rxy * 1.75
+        self.rexy = self.cxy + self.rxy * 1.65
         # self.rexy = self.cxy + self.rxy * 0
         self.uexy = self.cxy + self.uxy * 1
 
