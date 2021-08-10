@@ -81,6 +81,7 @@ def camloop(f=nop, threaded=False):
 
                 # cv.CAP_PROP_EXPOSURE, -5,
                 # cap.set(cv.CAP_PROP_CONTRAST, 0)
+                cap.set(cv.CAP_PROP_EXPOSURE, -3)
                 # cap.set(cv.CAP_PROP_AUTO_EXPOSURE, 1)
 
             print('trying to get h,w')
