@@ -31,7 +31,7 @@ def camloop(f=nop, threaded=False):
             cv2.imshow(window_name, frameobj.frame)
             fresh = True
         else:
-            k = cv2.waitKey(16) & 0xff
+            k = cv2.waitKey(32) & 0xff
             if k in [27,ord('q'),ord('f')]:
                 exit()
 
