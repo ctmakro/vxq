@@ -291,8 +291,20 @@ def chessboard_finder_gen(calibrate=True):
 
                         ncm = retval
                     else:
-                        ncm = cm.copy()
-                        ncm[0:2,0:2] *= 0.9 # smaller crop to deal with fisheye
+                        k = 0.5
+                        while 1:
+                            ncm = cm.copy()
+                            ncm[0:2,0:2] *= k # smaller crop to deal with fisheye
+                            h,w = frame.shape[0:2]
+
+                            p0 = [w//2, -h//20] # top side of original image
+                            p1 = cv.undistortPoints(np.array([p0],dtype='float32'), cm, dc, P=ncm)[0][0]
+                            print(p1.shape)
+                            if p1[0]<0 or p1[1]<0:
+                                print('k taken as ', k)
+                                break
+                            else:
+                                k+=0.05
 
                     print('dist coeffs')
 
@@ -336,7 +348,7 @@ def chessboard_finder_gen(calibrate=True):
                 m1,m2 = m1m2
 
             ud = cv.remap(frame, m1, m2,
-                interpolation = cv.INTER_LINEAR)
+                interpolation = cv.INTER_CUBIC)
             # ud = cv.undistort(frame, cm, dc, newCameraMatrix=ncm)
             text=f'undistorted in {int(interval()*1000)} '+text
 

@@ -16,6 +16,9 @@ def camloop(f=nop, threaded=False):
 
     window_name = 'camfeed'
 
+    target_camera = 'pro' or 'ov2659' or 'anc' or 'pro'
+    print('target_camera', target_camera)
+
     rh = result_holder = SN()
 
     rh.result = None
@@ -59,14 +62,11 @@ def camloop(f=nop, threaded=False):
                 print("Cannot open camera", id)
                 return False
 
-            target_camera = 'ov2659' or 'anc' or 'pro'
-
-            print('target_camera', target_camera)
             if target_camera=='ov2659':
                 # cap.set(3,1280); cap.set(4,1024)
                 cap.set(3,1600); cap.set(4,1200)
                 cap.set(cv.CAP_PROP_FPS, 30)
-                # cap.set(cv.CAP_PROP_CONTRAST, -4)
+                # cap.set(cv.CAP_PROP_CONTRAST, 0)
                 cap.set(cv.CAP_PROP_EXPOSURE, -10,)
                 cap.set(cv.CAP_PROP_AUTO_EXPOSURE, 20)
 
@@ -170,6 +170,9 @@ def camloop(f=nop, threaded=False):
             # smaller image for ease of processing
             optimal_width = ow = 960
             optimal_height = oh = 540
+
+            # if target_camera=='ov2659':
+            #     ow = 800; oh = 600
 
             scale = min(ow/w, oh/h)
             if scale < .9:
