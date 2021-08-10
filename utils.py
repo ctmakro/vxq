@@ -45,11 +45,11 @@ class MailWaiter:
             self.cond.notify()
 
     def recv(self, keep=False):
+        # with flock:
+        tt = 0.0
+        dt = 0.5
+        
         while 1:
-            # with flock:
-            tt = 0.0
-            dt = 0.5
-
             with self.cond:
                 if self.cond.wait(dt):
                     mail = self.mail
