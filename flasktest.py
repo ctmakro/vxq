@@ -72,6 +72,11 @@ class Div:
         if self.cb:
             self.cb(self)
 
+class PreCode(Div):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.classes.append('precode')
+
 class Button(Div):
     def __init__(self, **kw):
         super().__init__(**kw)
