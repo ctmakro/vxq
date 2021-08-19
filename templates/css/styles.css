@@ -58,3 +58,8 @@ div#container {
 .buttonrow {
     flex-flow: wrap;
 }
+
+.precode {
+    white-space: pre-line;
+    font-size: 10px;
+}

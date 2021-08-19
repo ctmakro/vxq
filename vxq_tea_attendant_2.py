@@ -49,7 +49,7 @@ class StatefulTag:
     def monitor(self):
         return f'[{self.l}:{self.r}]{self.appearance}({self.state})'
 
-    def update(self, tags):
+    def update(self):
         l,r = self.l, self.r
 
         ltag,rtag = None,None
@@ -114,12 +114,13 @@ class DaoChaStateMachine:
 
         for i in self.all_demands():
             s+=i.monitor()+'\n'
+        return s
 
     def all_demands(self):
         demand = []
         for i in self.tags:
             if i.state == 'demand_tea': demand.append(i)
-        return []
+        return demand
 
     def update_tags(self):
         for i in self.tags:
@@ -187,12 +188,22 @@ home_pos_up[2] = move_height
 ik_move_speed = ims = 200
 joint_move_speed = jms = 400
 
+fb_show = None
+button_texts, update_buttons = None, None
+
 def new_tealoop():
+    global fb_show, button_texts, update_buttons
     while 1:
         time.sleep(0.05)
         dcsm.update()
 
-        fb_show(dcsm.monitor())
+        if button_texts and update_buttons:
+            labels = [i.l for i in dcsm.all_demands()]
+            button_texts[0:len(labels)] = labels
+            update_buttons()
+
+        if fb_show:
+            fb_show(dcsm.monitor())
 
     def move_home():
         v.g1_cartesian_joint(home_pos_up, speed=jms)
@@ -200,7 +211,7 @@ def new_tealoop():
         time.sleep(0.5)
         dcsm.state == 'waiting'
 
-
+run_threaded(new_tealoop)
 
 
 def tealoop():
@@ -423,7 +434,7 @@ master_only = False
 update_buttons = lambda:None
 fprint = lambda *a:print(*a)
 fb_show = lambda s:print(s)
-button_texts = ['']*4
+button_texts = ['']*9
 
 def mvc(root):
     global update_buttons, button_texts, fprint, fb_show
@@ -512,6 +523,7 @@ def mvc(root):
 
 
     feedback_section2 = fbs2 = PreCode()
+    fbs2.text = 'example text'
     def fb_show(s):
         fbs2.text = s
     root+=[feedback_section2]

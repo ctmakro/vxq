@@ -74,14 +74,16 @@ def camloop(f=nop, threaded=False):
                 pass
 
             elif target_camera == 'pro':
-                cap.set(3,1280)
-                cap.set(4,720)
+                # cap.set(3,1280)
+                # cap.set(4,720)
+                cap.set(3,1920)
+                cap.set(4,1080)
 
                 cap.set(cv.CAP_PROP_FPS, 12)
 
                 # cv.CAP_PROP_EXPOSURE, -5,
                 # cap.set(cv.CAP_PROP_CONTRAST, 0)
-                cap.set(cv.CAP_PROP_EXPOSURE, -3)
+                cap.set(cv.CAP_PROP_EXPOSURE, -4)
                 # cap.set(cv.CAP_PROP_AUTO_EXPOSURE, 1)
 
             print('trying to get h,w')
@@ -689,8 +691,8 @@ def aruco_tracker_gen():
         interval()
 
         err+=frametimer()
-        if err>=0.25:
-            err-=0.25
+        if err>=0.2:
+            err-=0.2
             dd, dl = detect(frame)
             fo.drawtext(f'mrkr det in {int(interval()*1000)}')
         else:
