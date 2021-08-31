@@ -314,7 +314,7 @@ class Detection:
         self.cxy = np.sum(corners, 0) * .25
         self.uxy = np.sum(corners[0:2] - corners[2:4], 0) * .5
         self.rxy = np.sum(corners[1:2:4] - corners[0:2:3], 0) * 1
-        self.rexy = self.cxy + self.rxy * 1.65
+        self.rexy = self.cxy + self.rxy * (1.65 + 0.35)
         # self.rexy = self.cxy + self.rxy * 0
         self.uexy = self.cxy + self.uxy * 1
 
