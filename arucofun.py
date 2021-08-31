@@ -281,13 +281,13 @@ ac.cornerRefinementMethod = cv.aruco.CORNER_REFINE_SUBPIX
 # ac.cornerRefinementMethod = cv.aruco.CORNER_REFINE_APRILTAG
 ac.cornerRefinementMethod = cv.aruco.CORNER_REFINE_CONTOUR
 
-ac.minMarkerPerimeterRate = 0.02
 ac.maxMarkerPerimeterRate = 0.3
+ac.minMarkerPerimeterRate = 0.03
 
 ac.polygonalApproxAccuracyRate = 0.08
 # ac.polygonalApproxAccuracyRate = 0.04
 # ac.maxErroneousBitsInBorderRate = 0.6
-# ac.errorCorrectionRate = 0.9
+ac.errorCorrectionRate = 0.2
 # ac.aprilTagMaxLineFitMse = 5.0
 
 class Detection:
@@ -296,6 +296,9 @@ class Detection:
 
         self.iage = 0
         self.marker_id = mid
+
+        self.last_seen = time.time()
+
         self.update()
 
     def update(self):
@@ -321,6 +324,10 @@ class Detection:
         self.size = np.sqrt(
             (np.sum(np.square(tl-br)) + np.sum(np.square(tr-bl)))
         )
+        self.last_seen = time.time()
+
+    def get_age(self):
+        return time.time() - self.last_seen
 
 def detect(image):
     (corners, ids, rejected) = cv2.aruco.detectMarkers(image, marker_type,
@@ -335,6 +342,10 @@ def detect(image):
         ids = ids.flatten()
         # loop over the detected ArUCo corners
         for (markerCorner, markerID) in zip(corners, ids):
+
+            if markerID in (17,37,): # remove high false-positive rate markers
+                continue
+
             # extract the marker corners (which are always returned in
             # top-left, top-right, bottom-right, and bottom-left order)
             corners = markerCorner.reshape((4, 2))
@@ -536,6 +547,8 @@ def affine_estimator_gen(skip = False):
 
     return affine_estimator
 
+
+yellow, blue = np.array([50,255,255]), np.array([200,200,50])
 # camloop(affine_estimator_gen())
 def mark_detections(image, detection_l):
     for v in detection_l:
@@ -544,16 +557,21 @@ def mark_detections(image, detection_l):
         uexy = v.uexy
         # rexy = cxy + rxy*1.75
         rexy = v.rexy
-        iage = v.iage
+        # iage = v.iage
+        iage = v.get_age()
 
         cx,cy,uex,uey,rex,rey= round(cxy[0]), round(cxy[1]), \
             round(uexy[0]), round(uexy[1]),\
             round(rexy[0]), round(rexy[1])
 
-        iagec = round(np.clip(iage*20, 0, 255))
+        iagec = round(np.clip(iage*300, 0, 255))
+        iagec1 = iagec/255
+
+        yellowblue = tuple(round(i) for i in np.clip(
+            yellow*(1-iagec1) + blue*(iagec1), 0, 255))
 
         dwscircle(image, (cx, cy), round(size*0.2),
-            color=(200,200,50) if iage else (50,255,255) , shift=0, thickness=2, shadow=False)
+            color=yellowblue, shift=0, thickness=2, shadow=False)
 
         redgreen = (0,255-iagec,iagec)
         dwsline(image, (cx, cy), (uex, uey),
@@ -707,13 +725,27 @@ def aruco_tracker_gen():
                     v.corners = transform.transform(v.corners)
                     v.update()
 
-                v.iage+=1
-                if (v.iage>16)\
-                    or (v.cxy[0]<0) or (v.cxy[0]>frame.shape[1])\
-                    or (v.cxy[1]<0) or (v.cxy[1]>frame.shape[0]):
+                # v.iage+=1
+                # if (v.iage>16)\
+                #     or (v.cxy[0]<0) or (v.cxy[0]>frame.shape[1])\
+                #     or (v.cxy[1]<0) or (v.cxy[1]>frame.shape[0]):
+                #     del ind[k]
+
+                if (v.get_age()>1.3  # not seen for 1.3 seconds
+                    or (v.cxy[0]<0) or (v.cxy[0]>frame.shape[1])
+                    or (v.cxy[1]<0) or (v.cxy[1]>frame.shape[0])
+                    ):
                     del ind[k]
 
-        ind.update(dd)
+        for k,v in dd.items(): # for each new detection
+            if k not in ind: # if not in cache:
+                ind[k] = v
+
+            else:
+                ind[k].corners = v.corners
+                ind[k].update()
+
+        # ind.update(dd)
         tags = ind
 
         fo.draw(lambda:mark_detections(frame, tags.values()))
