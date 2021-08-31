@@ -24,6 +24,9 @@ tag_combinations = {
  40:41,
  38:39,
  36:37,
+
+ 4:5,
+ 6:7,
 }
 
 finish_adding_tea = {}
@@ -37,8 +40,8 @@ move_height = mcrcf['move_height']
 home_pos_up = home_pos.copy()
 home_pos_up[2] = move_height
 
-ik_move_speed = ims = 200
-joint_move_speed = jms = 400
+ik_move_speed = ims = 200 * 0.9
+joint_move_speed = jms = 400 * 0.9
 
 def tealoop():
     global button_texts, update_buttons
@@ -68,7 +71,8 @@ def tealoop():
 
                     for j in tag_combinations.keys():
                         if j in tags:
-                            if tag_combinations[j] not in tags:
+                            if (tag_combinations[j] not in tags
+                            and tags[j].get_age()<0.5):
                                 # only left in
                                 if j not in finish_adding_tea:
                                     try_move_to_5(j)
@@ -171,7 +175,7 @@ def try_move_to_5(target=5):
                         #     start=home_pos_up,
                         # )
                         v.g1_cartesian_ik(
-                            list(rc)+[default_height],
+                            list(rc)+[default_height+60],
                             # j1_first = True,
                             speed=ims,
 
@@ -179,11 +183,11 @@ def try_move_to_5(target=5):
                         )
                         if cancelled(): return
                         # v.g1_cartesian_joint(
-                        # # v.g1_cartesian_ik(
-                        #     list(rc)+[default_height],
-                        #     j1_first = True,
-                        #     speed=jms,
-                        # )
+                        v.g1_cartesian_ik(
+                            list(rc)+[default_height],
+                            # j1_first = True,
+                            speed=jms,
+                        )
                         time.sleep(1)
 
                         if cancelled(): return
@@ -199,7 +203,7 @@ def try_move_to_5(target=5):
 
                         v.g1_cartesian_joint(
                         # v.g1_cartesian_ik(
-                            list(rc)+[move_height],
+                            list(rc)+[default_height+0],
                             j1_first = True,
                             speed=jms,
                         )
