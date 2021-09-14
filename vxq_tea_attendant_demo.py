@@ -24,9 +24,10 @@ tag_combinations = {
  40:41,
  38:39,
  36:37,
-
+ 16:15,
  4:5,
  6:7,
+ 8:14,
 }
 
 finish_adding_tea = {}
@@ -194,7 +195,7 @@ def try_move_to_5(target=5):
                         v.go_j(4, 1800) # 出水
                         if cancelled(): return
 
-                        time.sleep(3)
+                        time.sleep(2.5)
 
                         if cancelled(): return
                         v.go_j(4, 2048) # 停
