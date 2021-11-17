@@ -16,7 +16,7 @@ def camloop(f=nop, threaded=False):
 
     window_name = 'camfeed'
 
-    target_camera = 'pro' or 'ov2659' or 'anc' or 'pro'
+    target_camera = 'pro2' or 'ov2659' or 'anc' or 'pro'
     print('target_camera', target_camera)
 
     rh = result_holder = SN()
@@ -86,12 +86,22 @@ def camloop(f=nop, threaded=False):
                 cap.set(cv.CAP_PROP_EXPOSURE, -4)
                 # cap.set(cv.CAP_PROP_AUTO_EXPOSURE, 1)
 
+            elif target_camera == 'pro2':
+                cap.set(3,1280)
+                cap.set(4,960)
+                cap.set(cv.CAP_PROP_FPS, 10)
+                cap.set(cv.CAP_PROP_EXPOSURE, -5)
+                pass
+
+
             print('trying to get h,w')
             height = cap.get(4)
             width = cap.get(3)
             be = cap.getBackendName()
 
-            print('height:', height, 'width:', width, 'backend:', be)
+            fourcc = cap.get(cv2.CAP_PROP_FOURCC)
+
+            print('height:', height, 'width:', width, 'backend:', be, 'fourcc:', fourcc)
 
             return cap
             # raise Exception('frame height not 480')
